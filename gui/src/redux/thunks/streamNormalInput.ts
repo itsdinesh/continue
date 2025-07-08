@@ -5,7 +5,7 @@ import { getRuleId } from "core/llm/rules/getSystemMessageWithRules";
 import { ToCoreProtocol } from "core/protocol";
 import { BuiltInToolNames } from "core/tools/builtIn";
 import { selectActiveTools } from "../selectors/selectActiveTools";
-import { selectCurrentToolCall } from "../selectors/selectCurrentToolCall";
+import { selectCurrentToolCalls } from "../selectors/selectCurrentToolCall";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   abortStream,
@@ -192,11 +192,12 @@ export const streamNormalInput = createAsyncThunk<
       }
     }
 
-    // If it's a tool call that is automatically accepted, we should call it
+    // Handle multiple tool calls that may be automatically accepted
     const newState = getState();
     const toolSettings = newState.ui.toolSettings;
-    const toolCallState = selectCurrentToolCall(newState);
-    if (toolCallState) {
+    const toolCallStates = selectCurrentToolCalls(newState);
+    
+    for (const toolCallState of toolCallStates) {
       dispatch(
         setToolGenerated({
           toolCallId: toolCallState.toolCallId,
