@@ -5,7 +5,7 @@ import { getRuleId } from "core/llm/rules/getSystemMessageWithRules";
 import { ToCoreProtocol } from "core/protocol";
 import { BuiltInToolNames } from "core/tools/builtIn";
 import { selectActiveTools } from "../selectors/selectActiveTools";
-import { selectCurrentToolCalls } from "../selectors/selectCurrentToolCall";
+import { selectCurrentToolCall } from "../selectors/selectCurrentToolCall";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   abortStream,
