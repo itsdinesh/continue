@@ -545,7 +545,7 @@ export class Core {
         msg.data,
         undefined,
       );
-      return outcome ? [outcome.completion] : [];
+      return outcome ? [outcome.completion, outcome.originalEditableRange] : [];
     });
 
     on("streamDiffLines", async (msg) => {
