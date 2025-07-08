@@ -34,7 +34,7 @@ import { toolCallCtxItemToCtxItemWithId } from "../../pages/gui/ToolCallDiv/tool
 import { addToolCallDeltaToState } from "../../util/toolCallState";
 import { RootState } from "../store";
 import { streamResponseThunk } from "../thunks/streamResponse";
-import { findCurrentToolCall, findToolCall, findToolOutput } from "../util";
+import { findToolCall, findToolOutput } from "../util";
 
 const getIdeMessenger = () => (window as any).ideMessenger;
 
@@ -788,12 +788,7 @@ function addPassthroughCases(
   });
 }
 
-export const selectCurrentToolCall = createSelector(
-  (store: RootState) => store.session.history,
-  (history) => {
-    return findCurrentToolCall(history);
-  },
-);
+// Moved to ../selectors/selectCurrentToolCall.ts to avoid duplication
 
 export const selectApplyStateByStreamId = createSelector(
   [
