@@ -8,7 +8,6 @@ import {
 import { JSONContent } from "@tiptap/react";
 import {
   ApplyState,
-  AssistantChatMessage,
   ChatHistoryItem,
   ChatMessage,
   ContextItem,
@@ -19,8 +18,7 @@ import {
   RuleWithSource,
   Session,
   SessionMetadata,
-  ThinkingChatMessage,
-  Tool,
+  Tool
 } from "core";
 import { NEW_SESSION_TITLE } from "core/util/constants";
 import {
@@ -74,7 +72,7 @@ const initialState: SessionState = {
   id: uuidv4(),
   streamAborter: new AbortController(),
   symbols: {},
-  mode: "agent",
+  mode: "chat",
   isInEdit: false,
   codeBlockApplyStates: {
     states: [],
@@ -141,6 +139,14 @@ export const sessionSlice = createSlice({
           // Cancel any tool calls that are dangling and generated
           if (message.toolCallState?.status === "generated") {
             message.toolCallState.status = "canceled";
+          }
+          // Also cancel any tool calls in the toolCallStates array
+          if (message.toolCallStates) {
+            message.toolCallStates.forEach(toolCallState => {
+              if (toolCallState.status === "generated") {
+                toolCallState.status = "canceled";
+              }
+            });
           }
           break;
         }
@@ -332,10 +338,12 @@ export const sessionSlice = createSlice({
     streamUpdate: (state, action: PayloadAction<ChatMessage[]>) => {
       if (state.history.length) {
         for (const message of action.payload) {
-          let lastItem = state.history[state.history.length - 1];
-          let lastMessage = lastItem.message;
+          const lastItem = state.history[state.history.length - 1];
+          const lastMessage = lastItem.message;
 
           if (message.role === "thinking" && message.redactedThinking) {
+            console.log("add redacted_thinking blocks");
+
             state.history.push({
               message: {
                 role: "thinking",
@@ -348,74 +356,6 @@ export const sessionSlice = createSlice({
             continue;
           }
 
-          const messageContent = message.content
-            ? renderChatMessage(message)
-            : "";
-
-          // OpenAI-compatible models in agent mode sometimes send
-          // all of their data in one message, so we handle that case early.
-          if (messageContent) {
-            const thinkMatches = messageContent.match(
-              /<think>([\s\S]*)<\/think>([\s\S]*)/,
-            );
-            if (thinkMatches) {
-              // The order that they seem to consistently use is:
-              //
-              // <think>Thinking text</think>
-              // Text to show to the user
-
-              lastItem.reasoning = {
-                text: thinkMatches[1].trim(),
-                startAt: Date.now(),
-                endAt: Date.now(),
-                active: false,
-              };
-
-              // This is the chat message that we should show to the user.
-              // We always need to push this even if it is empty,
-              // because we cannot attach tool calls to a Thinking message.
-              // That would break `messageHasToolCallId`.
-              state.history.push({
-                message: {
-                  role: "assistant",
-                  content: thinkMatches[2].trim(),
-                  id: uuidv4(),
-                },
-                contextItems: [],
-              });
-              lastItem = state.history[state.history.length - 1];
-              lastMessage = lastItem.message;
-
-              if (
-                (message.role === "assistant" || message.role === "thinking") &&
-                message.toolCalls?.[0]
-              ) {
-                // Only support one tool call for now.
-                // There are further changes required throughout the system
-                // to support multiple tool calls in a single message from
-                // OpenAI-compatible providers.
-                const toolCallDelta = message.toolCalls[0];
-                const newToolCallState = addToolCallDeltaToState(
-                  toolCallDelta,
-                  lastItem.toolCallState,
-                );
-                lastItem.toolCallState = newToolCallState;
-                // We know this is one of these two types because we just added it
-                const curMessage = lastMessage as
-                  | AssistantChatMessage
-                  | ThinkingChatMessage;
-                if (curMessage.toolCalls) {
-                  curMessage.toolCalls.push(newToolCallState.toolCall);
-                } else {
-                  curMessage.toolCalls = [newToolCallState.toolCall];
-                }
-              }
-
-              return;
-            }
-          }
-
-          // The remainder of this function handles streaming messages
           if (
             lastMessage.role !== message.role ||
             // This is for when a tool call comes immediately before/after tool call
@@ -431,75 +371,68 @@ export const sessionSlice = createSlice({
             const historyItem: ChatHistoryItemWithMessageId = {
               message: {
                 ...message,
-                content: "",
+                content: renderChatMessage(message),
                 id: uuidv4(),
               },
               contextItems: [],
             };
-            if (message.role === "assistant" && message.toolCalls?.[0]) {
-              const toolCallDelta = message.toolCalls[0];
-              historyItem.toolCallState = addToolCallDeltaToState(
-                toolCallDelta,
-                undefined,
+            if (message.role === "assistant" && message.toolCalls?.length) {
+              // Handle multiple tool calls
+              historyItem.toolCallStates = message.toolCalls.map(toolCallDelta => 
+                addToolCallDeltaToState(toolCallDelta, undefined)
               );
+              // Maintain backward compatibility with single toolCallState
+              historyItem.toolCallState = historyItem.toolCallStates[0];
             }
             state.history.push(historyItem);
-            lastItem = state.history[state.history.length - 1];
-            lastMessage = lastItem.message;
-          }
-
-          // Add to the existing message
-          if (messageContent) {
-            if (messageContent.includes("<think>")) {
-              lastItem.reasoning = {
-                startAt: Date.now(),
-                active: true,
-                text: messageContent.replace("<think>", "").trim(),
-              };
-            } else if (
-              lastItem.reasoning?.active &&
-              messageContent.includes("</think>")
-            ) {
-              const [reasoningEnd, answerStart] =
-                messageContent.split("</think>");
-              lastItem.reasoning.text += reasoningEnd.trimEnd();
-              lastItem.reasoning.active = false;
-              lastItem.reasoning.endAt = Date.now();
-              lastMessage.content += answerStart.trimStart();
-            } else if (lastItem.reasoning?.active) {
-              if (
-                lastItem.reasoning.text.length > 0 ||
-                messageContent.trim().length > 0
+          } else {
+            // Add to the existing message
+            if (message.content) {
+              const messageContent = renderChatMessage(message);
+              if (messageContent.includes("<think>")) {
+                lastItem.reasoning = {
+                  startAt: Date.now(),
+                  active: true,
+                  text: messageContent.replace("<think>", "").trim(),
+                };
+              } else if (
+                lastItem.reasoning?.active &&
+                messageContent.includes("</think>")
               ) {
+                const [reasoningEnd, answerStart] =
+                  messageContent.split("</think>");
+                lastItem.reasoning.text += reasoningEnd.trimEnd();
+                lastItem.reasoning.active = false;
+                lastItem.reasoning.endAt = Date.now();
+                lastMessage.content += answerStart.trimStart();
+              } else if (lastItem.reasoning?.active) {
                 lastItem.reasoning.text += messageContent;
-              }
-            } else {
-              // Note this only works because new message above
-              // was already rendered from parts to string
-              if (
-                lastMessage.content.length > 0 ||
-                messageContent.trim().length > 0
-              ) {
+              } else {
+                // Note this only works because new message above
+                // was already rendered from parts to string
                 lastMessage.content += messageContent;
               }
+            } else if (message.role === "thinking" && message.signature) {
+              if (lastMessage.role === "thinking") {
+                lastMessage.signature = message.signature;
+              }
+            } else if (
+              message.role === "assistant" &&
+              message.toolCalls?.length &&
+              lastMessage.role === "assistant"
+            ) {
+              // Handle multiple tool calls in streaming updates
+              const existingToolCallStates = lastItem.toolCallStates || [];
+              const updatedToolCallStates = message.toolCalls.map((toolCallDelta, index) => {
+                const existingState = existingToolCallStates[index];
+                return addToolCallDeltaToState(toolCallDelta, existingState);
+              });
+              
+              lastItem.toolCallStates = updatedToolCallStates;
+              // Maintain backward compatibility
+              lastItem.toolCallState = updatedToolCallStates[0];
+              lastMessage.toolCalls = updatedToolCallStates.map(state => state.toolCall);
             }
-          } else if (message.role === "thinking" && message.signature) {
-            if (lastMessage.role === "thinking") {
-              lastMessage.signature = message.signature;
-            }
-          } else if (
-            message.role === "assistant" &&
-            message.toolCalls?.[0] &&
-            lastMessage.role === "assistant"
-          ) {
-            // Intentionally only supporting one tool call for now.
-            const toolCallDelta = message.toolCalls[0];
-            const newToolCallState = addToolCallDeltaToState(
-              toolCallDelta,
-              lastItem.toolCallState,
-            );
-            lastItem.toolCallState = newToolCallState;
-            lastMessage.toolCalls = [newToolCallState.toolCall];
           }
         }
       }
