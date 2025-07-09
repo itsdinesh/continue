@@ -24,7 +24,6 @@ import ContinueInputBox from "../../components/mainInput/ContinueInputBox";
 import { useOnboardingCard } from "../../components/OnboardingCard";
 import StepContainer from "../../components/StepContainer";
 import { TabBar } from "../../components/TabBar/TabBar";
-import { ToolCallsGroup } from "./ToolCallsGroup";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useWebviewListener } from "../../hooks/useWebviewListener";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
@@ -42,11 +41,11 @@ import { streamEditThunk } from "../../redux/thunks/edit";
 import { loadLastSession } from "../../redux/thunks/session";
 import { streamResponseThunk } from "../../redux/thunks/streamResponse";
 import { isJetBrains, isMetaEquivalentKeyPressed } from "../../util";
+import { ToolCallsGroup } from "./ToolCallsGroup";
 
 import { cancelStream } from "../../redux/thunks/cancelStream";
 import { EmptyChatBody } from "./EmptyChatBody";
 import { ExploreDialogWatcher } from "./ExploreDialogWatcher";
-import { ToolCallDiv } from "./ToolCallDiv";
 import { useAutoScroll } from "./useAutoScroll";
 
 const StepsDiv = styled.div`
@@ -298,9 +297,13 @@ export function Chat() {
             <div className="thread-message">
               <TimelineItem
                 item={item}
-                iconElement={<ChatBubbleOvalLeftIcon width="16px" height="16px" />}
+                iconElement={
+                  <ChatBubbleOvalLeftIcon width="16px" height="16px" />
+                }
                 open={
-                  typeof stepsOpen[index] === "undefined" ? true : stepsOpen[index]!
+                  typeof stepsOpen[index] === "undefined"
+                    ? true
+                    : stepsOpen[index]!
                 }
                 onToggle={() => {}}
               >
@@ -311,7 +314,7 @@ export function Chat() {
                 />
               </TimelineItem>
             </div>
-            
+
             {/* Additionally render tool calls if they exist */}
             {toolCallStates && (
               <ToolCallsGroup
