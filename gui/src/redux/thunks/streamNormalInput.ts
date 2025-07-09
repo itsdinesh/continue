@@ -12,9 +12,8 @@ import {
   addPromptCompletionPair,
   setActive,
   setAppliedRulesAtIndex,
-  setInactive,
   setToolGenerated,
-  streamUpdate,
+  streamUpdate
 } from "../slices/sessionSlice";
 import { ThunkApiType } from "../store";
 import {
@@ -196,29 +195,35 @@ export const streamNormalInput = createAsyncThunk<
     const newState = getState();
     const toolSettings = newState.ui.toolSettings;
     const toolCallStates = selectCurrentToolCalls(newState);
-    
-    
-    for (const toolCallState of toolCallStates) {
+
+    // Set all tools as generated first
+    toolCallStates.forEach((toolCallState) => {
       dispatch(
         setToolGenerated({
           toolCallId: toolCallState.toolCallId,
           tools: state.config.config.tools,
         }),
       );
+    });
 
-      if (
+    // Run tool calls in parallel for auto-approved tools
+    const autoApprovedToolCalls = toolCallStates.filter(
+      (toolCallState) =>
         toolSettings[toolCallState.toolCall.function.name] ===
-        "allowedWithoutPermission"
-      ) {
-        const response = await dispatch(
-          callToolById({ toolCallId: toolCallState.toolCallId })
-        );
-        unwrapResult(response);
-      } else {
-        dispatch(setInactive());
-      }
-    } else {
-      dispatch(setInactive());
+        "allowedWithoutPermission",
+    );
+
+    if (autoApprovedToolCalls.length > 0) {
+      const toolCallPromises = autoApprovedToolCalls.map(
+        async (toolCallState) => {
+          const response = await dispatch(
+            callToolById({ toolCallId: toolCallState.toolCallId }),
+          );
+          return unwrapResult(response);
+        },
+      );
+
+      await Promise.all(toolCallPromises);
     }
   },
 );
