@@ -41,7 +41,7 @@ import { streamEditThunk } from "../../redux/thunks/edit";
 import { loadLastSession } from "../../redux/thunks/session";
 import { streamResponseThunk } from "../../redux/thunks/streamResponse";
 import { isJetBrains, isMetaEquivalentKeyPressed } from "../../util";
-import { ToolCallsGroup } from "./ToolCallsGroup";
+import { ToolCallDiv } from "./ToolCallDiv";
 
 import { cancelStream } from "../../redux/thunks/cancelStream";
 import { EmptyChatBody } from "./EmptyChatBody";
@@ -315,9 +315,8 @@ export function Chat() {
               </TimelineItem>
             </div>
 
-            {/* Additionally render tool calls if they exist */}
             {toolCallStates && (
-              <ToolCallsGroup
+              <ToolCallDiv
                 toolCallStates={toolCallStates}
                 historyIndex={index}
               />
