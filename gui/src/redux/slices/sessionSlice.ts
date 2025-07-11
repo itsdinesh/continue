@@ -412,7 +412,6 @@ export const sessionSlice = createSlice({
       }
     },
     setInactive: (state) => {
-      debugger;
       const curMessage = state.history.at(-1);
 
       if (curMessage) {
