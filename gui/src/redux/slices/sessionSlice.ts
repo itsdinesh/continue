@@ -33,7 +33,101 @@ import { toolCallCtxItemToCtxItemWithId } from "../../pages/gui/ToolCallDiv/util
 import { addToolCallDeltaToState } from "../../util/toolCallState";
 import { RootState } from "../store";
 import { streamResponseThunk } from "../thunks/streamResponse";
-import { findToolCallById, findToolOutputById } from "../util";
+import { findChatHistoryItemByToolCallId, findToolCallById } from "../util";
+
+/**
+ * Initializes tool call states for a new message containing tool calls.
+ * This function is called when we receive a complete message with tool calls,
+ * typically in non-streaming scenarios or when processing the first chunk
+ * of a streaming message that contains tool calls.
+ *
+ * @param message - The chat message containing tool calls to process
+ * @param lastItem - The chat history item to attach tool call states to
+ */
+export function handleToolCallsInMessage(
+  message: ChatMessage,
+  lastItem: ChatHistoryItemWithMessageId,
+): void {
+  if (
+    (message.role === "assistant" || message.role === "thinking") &&
+    message.toolCalls?.length
+  ) {
+    // Initialize tool call states for each tool call in the message
+    // Each tool call gets its own state to track generation/execution progress
+    lastItem.toolCallStates = message.toolCalls.map((toolCallDelta) =>
+      addToolCallDeltaToState(toolCallDelta, undefined),
+    );
+
+    // Update the message's toolCalls array to reflect the processed tool calls
+    // We can safely cast because we verified the role above
+    const curMessage = lastItem.message as
+      | AssistantChatMessage
+      | ThinkingChatMessage;
+    curMessage.toolCalls = lastItem.toolCallStates.map(
+      (state) => state.toolCall,
+    );
+  }
+}
+
+/**
+ * Handles incremental updates to tool calls during streaming responses.
+ * This function processes streaming deltas for tool calls, updating existing
+ * tool call states or creating new ones as needed. It uses ID-based matching
+ * to ensure tool call updates are applied to the correct tool call state.
+ *
+ * @param message - The streaming message chunk containing tool call deltas
+ * @param lastItem - The chat history item containing existing tool call states
+ */
+export function handleStreamingToolCallUpdates(
+  message: ChatMessage,
+  lastItem: ChatHistoryItemWithMessageId,
+): void {
+  if (
+    message.role === "assistant" &&
+    message.toolCalls?.length &&
+    lastItem.message.role === "assistant"
+  ) {
+    // Start with existing tool call states or empty array if none exist
+    const existingToolCallStates = lastItem.toolCallStates || [];
+    const updatedToolCallStates: ToolCallState[] = [...existingToolCallStates];
+
+    // Process each incoming tool call delta, matching by ID to update the correct state
+    for (const toolCallDelta of message.toolCalls) {
+      // Find existing state by matching toolCallId - this ensures we update
+      // the correct tool call even when multiple tool calls are being streamed
+      const existingStateIndex = updatedToolCallStates.findIndex(
+        (state) => state.toolCallId === toolCallDelta.id,
+      );
+
+      const existingState =
+        existingStateIndex >= 0
+          ? updatedToolCallStates[existingStateIndex]
+          : undefined;
+
+      // Apply the delta to create an updated state (either updating existing or creating new)
+      const updatedState = addToolCallDeltaToState(
+        toolCallDelta,
+        existingState,
+      );
+
+      if (existingStateIndex >= 0) {
+        // Update existing tool call state in place
+        updatedToolCallStates[existingStateIndex] = updatedState;
+      } else {
+        // Add new tool call state for a newly discovered tool call
+        updatedToolCallStates.push(updatedState);
+      }
+    }
+
+    // Replace the entire tool call states array with the updated version
+    lastItem.toolCallStates = updatedToolCallStates;
+
+    // Update the message's toolCalls array to reflect current tool call states
+    (lastItem.message as any).toolCalls = updatedToolCallStates.map(
+      (state) => state.toolCall,
+    );
+  }
+}
 
 // We need this to handle reorderings (e.g. a mid-array deletion) of the messages array.
 // The proper fix is adding a UUID to all chat messages, but this is the temp workaround.
@@ -318,6 +412,7 @@ export const sessionSlice = createSlice({
       }
     },
     setInactive: (state) => {
+      debugger;
       const curMessage = state.history.at(-1);
 
       if (curMessage) {
@@ -333,8 +428,8 @@ export const sessionSlice = createSlice({
     streamUpdate: (state, action: PayloadAction<ChatMessage[]>) => {
       if (state.history.length) {
         for (const message of action.payload) {
-          const lastItem = state.history[state.history.length - 1];
-          const lastMessage = lastItem.message;
+          let lastItem = state.history[state.history.length - 1];
+          let lastMessage = lastItem.message;
 
           if (message.role === "thinking" && message.redactedThinking) {
             console.log("add redacted_thinking blocks");
@@ -351,6 +446,51 @@ export const sessionSlice = createSlice({
             continue;
           }
 
+          const messageContent = message.content
+            ? renderChatMessage(message)
+            : "";
+
+          // OpenAI-compatible models in agent mode sometimes send
+          // all of their data in one message, so we handle that case early.
+          if (messageContent) {
+            const thinkMatches = messageContent.match(
+              /<think>([\s\S]*)<\/think>([\s\S]*)/,
+            );
+            if (thinkMatches) {
+              // The order that they seem to consistently use is:
+              //
+              // <think>Thinking text</think>
+              // Text to show to the user
+
+              lastItem.reasoning = {
+                text: thinkMatches[1].trim(),
+                startAt: Date.now(),
+                endAt: Date.now(),
+                active: false,
+              };
+
+              // This is the chat message that we should show to the user.
+              // We always need to push this even if it is empty,
+              // because we cannot attach tool calls to a Thinking message.
+              // That would break `messageHasToolCallId`.
+              state.history.push({
+                message: {
+                  role: "assistant",
+                  content: thinkMatches[2].trim(),
+                  id: uuidv4(),
+                },
+                contextItems: [],
+              });
+              lastItem = state.history[state.history.length - 1];
+              lastMessage = lastItem.message;
+
+              handleToolCallsInMessage(message, lastItem);
+
+              return;
+            }
+          }
+
+          // The remainder of this function handles streaming messages
           if (
             lastMessage.role !== message.role ||
             message.role === "tool" // Tool messages should always create new messages
@@ -365,110 +505,52 @@ export const sessionSlice = createSlice({
               },
               contextItems: [],
             };
-            if (message.role === "assistant" && message.toolCalls?.length) {
-              // Handle multiple tool calls
-              historyItem.toolCallStates = message.toolCalls.map(
-                (toolCallDelta) =>
-                  addToolCallDeltaToState(toolCallDelta, undefined),
-              );
-            }
+            handleToolCallsInMessage(message, historyItem);
             state.history.push(historyItem);
-          } else {
-            // Add to the existing message
+            lastItem = state.history[state.history.length - 1];
+            lastMessage = lastItem.message;
+          }
 
-            // Handle tool calls being added to existing assistant message
-            if (
-              message.role === "assistant" &&
-              (message as any).toolCalls?.length &&
-              !lastItem.toolCallStates
+          // Add to the existing message
+          if (messageContent) {
+            if (messageContent.includes("<think>")) {
+              lastItem.reasoning = {
+                startAt: Date.now(),
+                active: true,
+                text: messageContent.replace("<think>", "").trim(),
+              };
+            } else if (
+              lastItem.reasoning?.active &&
+              messageContent.includes("</think>")
             ) {
-              lastItem.toolCallStates = (message as any).toolCalls.map(
-                (toolCallDelta: any) =>
-                  addToolCallDeltaToState(toolCallDelta, undefined),
-              );
-              (lastMessage as any).toolCalls = lastItem.toolCallStates?.map(
-                (state) => state.toolCall,
-              );
-            }
-
-            // CRITICAL: Always ensure message.toolCalls is synchronized with toolCallStates
-            if (lastItem.toolCallStates && lastItem.toolCallStates.length > 0) {
-              (lastMessage as any).toolCalls = lastItem.toolCallStates.map(
-                (state) => state.toolCall,
-              );
-            }
-
-            if (message.content) {
-              const messageContent = renderChatMessage(message);
-              if (messageContent.includes("<think>")) {
-                lastItem.reasoning = {
-                  startAt: Date.now(),
-                  active: true,
-                  text: messageContent.replace("<think>", "").trim(),
-                };
-              } else if (
-                lastItem.reasoning?.active &&
-                messageContent.includes("</think>")
+              const [reasoningEnd, answerStart] =
+                messageContent.split("</think>");
+              lastItem.reasoning.text += reasoningEnd.trimEnd();
+              lastItem.reasoning.active = false;
+              lastItem.reasoning.endAt = Date.now();
+              lastMessage.content += answerStart.trimStart();
+            } else if (lastItem.reasoning?.active) {
+              if (
+                lastItem.reasoning.text.length > 0 ||
+                messageContent.trim().length > 0
               ) {
-                const [reasoningEnd, answerStart] =
-                  messageContent.split("</think>");
-                lastItem.reasoning.text += reasoningEnd.trimEnd();
-                lastItem.reasoning.active = false;
-                lastItem.reasoning.endAt = Date.now();
-                lastMessage.content += answerStart.trimStart();
-              } else if (lastItem.reasoning?.active) {
                 lastItem.reasoning.text += messageContent;
               } else {
                 // Note this only works because new message above
                 // was already rendered from parts to string
                 lastMessage.content += messageContent;
               }
-            } else if (message.role === "thinking" && message.signature) {
-              if (lastMessage.role === "thinking") {
-                lastMessage.signature = message.signature;
-              }
-            } else if (
-              message.role === "assistant" &&
-              message.toolCalls?.length &&
-              lastMessage.role === "assistant"
-            ) {
-              // Handle multiple tool calls in streaming updates - ID-based approach
-              const existingToolCallStates = lastItem.toolCallStates || [];
-              const updatedToolCallStates: ToolCallState[] = [
-                ...existingToolCallStates,
-              ];
-
-              // Process each incoming tool call delta by ID
-              for (const toolCallDelta of message.toolCalls) {
-                // Find existing state by toolCallId
-                const existingStateIndex = updatedToolCallStates.findIndex(
-                  (state) => state.toolCallId === toolCallDelta.id,
-                );
-
-                const existingState =
-                  existingStateIndex >= 0
-                    ? updatedToolCallStates[existingStateIndex]
-                    : undefined;
-
-                const updatedState = addToolCallDeltaToState(
-                  toolCallDelta,
-                  existingState,
-                );
-
-                if (existingStateIndex >= 0) {
-                  // Update existing state
-                  updatedToolCallStates[existingStateIndex] = updatedState;
-                } else {
-                  // Add new state
-                  updatedToolCallStates.push(updatedState);
-                }
-              }
-
-              lastItem.toolCallStates = updatedToolCallStates;
-              (lastMessage as any).toolCalls = updatedToolCallStates.map(
-                (state) => state.toolCall,
-              );
             }
+          } else if (message.role === "thinking" && message.signature) {
+            if (lastMessage.role === "thinking") {
+              lastMessage.signature = message.signature;
+            }
+          } else if (
+            message.role === "assistant" &&
+            message.toolCalls?.length &&
+            lastMessage.role === "assistant"
+          ) {
+            handleStreamingToolCallUpdates(message, lastItem);
           }
         }
       }
@@ -647,7 +729,7 @@ export const sessionSlice = createSlice({
       if (toolCallState) {
         toolCallState.output = action.payload.contextItems;
       }
-      const toolItem = findToolOutputById(
+      const toolItem = findChatHistoryItemByToolCallId(
         state.history,
         action.payload.toolCallId,
       );
