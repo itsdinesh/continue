@@ -678,6 +678,8 @@ export interface DiffLine extends DiffObject {
 
 interface DiffChar extends DiffObject {
   char: string;
+  oldIndex?: number;
+  newIndex?: number;
 }
 
 export interface Problem {
