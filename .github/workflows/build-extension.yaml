@@ -7,6 +7,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -44,14 +45,19 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
+      - name: Install core dependencies
+        run: |
+          cd ${{ github.workspace }}/core
+          npm ci
+
       - name: Install extension dependencies
         run: |
-          cd extensions/vscode
+          cd ${{ github.workspace }}/extensions/vscode
           npm ci
 
       - name: Prepackage the extension
         run: |
-          cd extensions/vscode
+          cd ${{ github.workspace }}/extensions/vscode
           npm run prepackage -- --target ${{ matrix.platform }}-${{ matrix.arch }}
 
       - name: Re-install esbuild
