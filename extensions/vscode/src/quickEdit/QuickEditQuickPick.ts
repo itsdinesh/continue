@@ -249,7 +249,7 @@ export class QuickEdit {
   ) => {
     const modelTitle = await this.getCurModelTitle();
     await this._streamEditWithInputAndContext(prompt, modelTitle);
-    this.openAcceptRejectMenu(prompt, path);
+    vscode.window.showInformationMessage("Edit completed successfully");
   };
 
   private async initializeFileSearchState() {
