@@ -248,13 +248,18 @@ export class QuickEdit {
     path: string | undefined,
   ) => {
     const modelTitle = await this.getCurModelTitle();
-    await this._streamEditWithInputAndContext(prompt, modelTitle);
-    const message = vscode.window.setStatusBarMessage("Edit completed successfully");
-    setTimeout(() => {
-      message.dispose();
-    }, 1000);
+    const statusBarMessage = vscode.window.setStatusBarMessage("Editing in progress...");
+    try {
+      await this._streamEditWithInputAndContext(prompt, modelTitle);
+      statusBarMessage.dispose();
+      vscode.window.setStatusBarMessage("Edit completed successfully", 5000);
+    } catch (error) {
+      statusBarMessage.dispose();
+      vscode.window.setStatusBarMessage("Edit failed", 5000);
+      throw error;
+    }
   };
-  
+
   private async initializeFileSearchState() {
     const workspaceDirs = await this.ide.getWorkspaceDirs();
 

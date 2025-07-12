@@ -40,6 +40,23 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
         start.translate(block.numGreen + block.numRed),
       );
 
+      if (codeLenses.length === 0) {
+        codeLenses.push(
+          new vscode.CodeLens(range, {
+            title: `Accept All`,
+            command: "continue.acceptDiff",
+          }),
+          new vscode.CodeLens(range, {
+            title: `Edit & Retry`,
+            command: "continue.quickEdit",
+          }),
+          new vscode.CodeLens(range, {
+            title: `Reject All`,
+            command: "continue.rejectDiff",
+          }),
+        );
+      }
+
       codeLenses.push(
         new vscode.CodeLens(range, {
           title: `Accept`,
@@ -52,15 +69,6 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
           arguments: [filepath, i],
         }),
       );
-
-      if (codeLenses.length === 2) {
-        codeLenses.push(
-          new vscode.CodeLens(range, {
-            title: `${getMetaKeyLabel()}I to add instructions`,
-            command: "",
-          }),
-        );
-      }
     }
 
     return codeLenses;

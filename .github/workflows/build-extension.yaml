@@ -28,7 +28,7 @@ jobs:
           - os: ubuntu-latest
             platform: alpine
             arch: x64
-          - os: macos-latest-large
+          - os: macos-13
             platform: darwin
             arch: x64
           - os: macos-latest
