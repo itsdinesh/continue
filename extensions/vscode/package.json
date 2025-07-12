@@ -2,7 +2,7 @@
   "name": "continue",
   "icon": "media/icon.png",
   "author": "Continue Dev, Inc",
-  "version": "0.9.224",
+  "version": "0.9.224-fork",
   "repository": {
     "type": "git",
     "url": "https://github.com/continuedev/continue"
@@ -305,6 +305,12 @@
         "key": "shift+ctrl+enter"
       },
       {
+        "command": "continue.acceptDiff",
+        "mac": "cmd+s",
+        "key": "ctrl+s",
+        "when": "continue.diffVisible"
+      },
+      {
         "command": "continue.rejectDiff",
         "mac": "shift+cmd+backspace",
         "key": "shift+ctrl+backspace"
@@ -339,8 +345,8 @@
       },
       {
         "command": "continue.quickEdit",
-        "mac": "cmd+i",
-        "key": "ctrl+i"
+        "mac": "alt+k",
+        "key": "alt+k"
       },
       {
         "command": "continue.debugTerminal",

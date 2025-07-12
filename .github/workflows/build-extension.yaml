@@ -28,10 +28,10 @@ jobs:
           - os: ubuntu-latest
             platform: alpine
             arch: x64
-          - os: macos-12
+          - os: macos-latest-large
             platform: darwin
             arch: x64
-          - os: macos-12
+          - os: macos-latest
             platform: darwin
             arch: arm64
     steps:
