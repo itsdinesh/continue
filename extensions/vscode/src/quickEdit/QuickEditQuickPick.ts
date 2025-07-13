@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { IDE, ILLM, RuleWithSource } from "core";
 import { ConfigHandler } from "core/config/ConfigHandler";
+import { getModelByRole } from "core/config/util";
 import { DataLogger } from "core/data/log";
 import { walkDir } from "core/indexing/walkDir";
 import { Telemetry } from "core/util/posthog";
@@ -314,6 +315,30 @@ export class QuickEdit {
   }
 
   /**
+   * Gets the model title the user has chosen, or their default model
+   */
+  private async getCurModelTitle() {
+    if (this._curModelTitle) {
+      return this._curModelTitle;
+    }
+
+    const { config } = await this.configHandler.loadConfig();
+    if (!config) {
+      return null;
+    }
+
+    return (
+      getModelByRole(config, "inlineEdit")?.title ??
+      (await this.webviewProtocol.request(
+        "getDefaultModelTitle",
+        undefined,
+        false,
+      )) ??
+      config.models?.[0]?.title
+    );
+  }
+
+  /**
    * Generates a title for the Quick Pick, including the
    * file name and selected line(s) if available.
    *
@@ -398,16 +423,16 @@ export class QuickEdit {
     label: QuickEditInitialItemLabels | undefined;
     value: string | undefined;
   }> {
-    const currentModel = await this.getCurModel();
-;
-    if (!currentModel) {
+    const modelTitle = await this.getCurModelTitle();
+
+    if (!modelTitle) {
       this.ide.showToast("error", "Please configure a model to use Quick Edit");
       return { label: undefined, value: undefined };
     }
 
     const quickPick = vscode.window.createQuickPick();
 
-    const initialItems = this.getInitialItems(currentModel.model);
+    const initialItems = this.getInitialItems(modelTitle);
     quickPick.items = initialItems;
     quickPick.placeholder =
       "Enter a prompt to edit your code (@ to search files, ⏎ to submit)";
@@ -480,12 +505,14 @@ export class QuickEdit {
           // search character to the end of the string
           const searchQuery = value.substring(lastAtIndex + 1);
 
-          const searchResults = this.fileSearch.search(searchQuery);
+          const searchResults = this.miniSearch.search(
+            searchQuery,
+          ) as unknown as FileMiniSearchResult[];
 
           if (searchResults.length > 0) {
             quickPick.items = searchResults
-              .map(({ relativePath }) => ({
-                label: relativePath,
+              .map(({ filename }) => ({
+                label: filename,
                 alwaysShow: true,
               }))
               .slice(0, QuickEdit.maxFileSearchResults);
@@ -579,14 +606,14 @@ export class QuickEdit {
         break;
 
       case QuickEditInitialItemLabels.Model:
-        const curModel = await this.getCurModel();
+        const curModelTitle = await this.getCurModelTitle();
 
-        if (!curModel) {
+        if (!curModelTitle) {
           break;
         }
 
         const selectedModelTitle = await getModelQuickPickVal(
-          curModel.model,
+          curModelTitle,
           config,
         );
 
