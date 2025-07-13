@@ -44,10 +44,10 @@ jobs:
           cd ${{ github.workspace }}/packages/openai-adapters
           npm ci
 
-      # - name: Build openai-adapters
-      #   run: |
-      #     cd ${{ github.workspace }}/packages/openai-adapters
-      #     npm run build
+      - name: Build openai-adapters
+        run: |
+          cd ${{ github.workspace }}/packages/openai-adapters
+          npm run build
 
       - name: Install core dependencies
         run: |
