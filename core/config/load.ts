@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import os from "os";
 import path from "path";
-import { ILLM } from "../index.js";
+import { IDE, ILLM } from "../index.js";
 
 import {
   ConfigResult,

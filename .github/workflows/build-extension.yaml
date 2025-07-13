@@ -49,6 +49,11 @@ jobs:
           cd ${{ github.workspace }}/extensions/vscode
           npm ci
 
+      - name: Install openai-adapters dependencies
+        run: |
+          cd ${{ github.workspace }}/packages/openai-adapters
+          npm ci
+
       - name: Prepackage the extension
         run: |
           cd ${{ github.workspace }}/extensions/vscode
