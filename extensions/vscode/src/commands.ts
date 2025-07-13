@@ -347,7 +347,7 @@ const getCommandsMap: (
       focusGUI();
       void sidebar.webviewProtocol?.request("generateRule", undefined);
     },
-    "continue.quickEdit": async (args: QuickEditShowParams) => {
+    "continue.quickEdit": async (args?: QuickEditShowParams) => {
       captureCommandTelemetry("quickEdit");
       quickEdit.show(args);
     },

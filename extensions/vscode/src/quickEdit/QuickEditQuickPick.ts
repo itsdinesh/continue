@@ -1,20 +1,17 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { IDE, ILLM, RuleWithSource } from "core";
+import { ConfigHandler } from "core/config/ConfigHandler";
 import { DataLogger } from "core/data/log";
 import { walkDir } from "core/indexing/walkDir";
 import { Telemetry } from "core/util/posthog";
+import MiniSearch from "minisearch";
 import * as vscode from "vscode";
 import { VerticalDiffManager } from "../diff/vertical/manager";
+import { FileSearch } from "../util/FileSearch";
 import { VsCodeWebviewProtocol } from "../webviewProtocol";
 import { getContextProviderQuickPickVal } from "./ContextProvidersQuickPick";
 import { appendToHistory, getHistoryQuickPickVal } from "./HistoryQuickPick";
 import { getModelQuickPickVal } from "./ModelSelectionQuickPick";
-
-// @ts-ignore - error finding typings
-import { ConfigHandler } from "core/config/ConfigHandler";
-import { getModelByRole } from "core/config/util";
-// @ts-ignore
-import MiniSearch from "minisearch";
 
 /**
  * Used to track what action to take after a user interacts
@@ -122,6 +119,7 @@ export class QuickEdit {
     private readonly webviewProtocol: VsCodeWebviewProtocol,
     private readonly ide: IDE,
     private readonly context: vscode.ExtensionContext,
+    private readonly fileSearch: FileSearch,
   ) {
     this.initializeFileSearchState();
   }
@@ -236,7 +234,8 @@ export class QuickEdit {
         default:
           break;
       }
-      let model = await this.getCurModelTitle();
+      let model = await this.getCurModel();
+
       void DataLogger.getInstance().logDevData({
         name: "quickEdit",
         data: {
@@ -247,6 +246,7 @@ export class QuickEdit {
           model: model?.title,
         },
       });
+
       quickPick.dispose();
     });
   }
@@ -255,7 +255,11 @@ export class QuickEdit {
     prompt: string,
     path: string | undefined,
   ) => {
-    const model = await this.getCurModelTitle();
+    const model = await this.getCurModel();
+    if (!model) {
+      throw new Error("No model selected");
+    }
+
     const { config } = await this.configHandler.loadConfig();
     const rules = config?.rules ?? []; // no need to error - getCurModel above will handle
 
@@ -300,22 +304,13 @@ export class QuickEdit {
   /**
    * Gets the model title the user has chosen, or their default model
    */
-  private async getCurModelTitle() {
-    if (this._curModelTitle) {
-      return this._curModelTitle;
+  private async getCurModel(): Promise<ILLM | null> {
+    const { config } = await this.configHandler.loadConfig();
+    if (!config) {
+      return null;
     }
 
-    const config = await this.configHandler.loadConfig();
-
-    return (
-      getModelByRole(config, "inlineEdit")?.title ??
-      (await this.webviewProtocol.request(
-        "getDefaultModelTitle",
-        undefined,
-        false,
-      )) ??
-      config.models[0]?.title
-    );
+    return config.selectedModelByRole.edit ?? config.selectedModelByRole.chat;
   }
 
   /**
@@ -340,8 +335,9 @@ export class QuickEdit {
 
     return isSelectionEmpty
       ? `Edit ${fileName}`
-      : `Edit ${fileName}:${start.line}${end.line > start.line ? `-${end.line}` : ""
-      }`;
+      : `Edit ${fileName}:${start.line}${
+          end.line > start.line ? `-${end.line}` : ""
+        }`;
   };
 
   private async _streamEditWithInputAndContext(
@@ -370,7 +366,7 @@ export class QuickEdit {
       prompt = this.contextProviderStr + prompt;
     }
 
-    this.webviewProtocol.request("incrementFtc", undefined);
+    void this.webviewProtocol.request("incrementFtc", undefined);
 
     await this.verticalDiffManager.streamEdit({
       input: prompt,
@@ -381,7 +377,7 @@ export class QuickEdit {
     });
   }
 
-  private getInitialItems(modelTitle: string): vscode.QuickPickItem[] {
+  private getInitialItems(): vscode.QuickPickItem[] {
     return [
       {
         label: QuickEditInitialItemLabels.History,
@@ -391,10 +387,6 @@ export class QuickEdit {
         label: QuickEditInitialItemLabels.ContextProviders,
         detail: "$(add) Add context to your prompt",
       },
-      {
-        label: QuickEditInitialItemLabels.Model,
-        detail: `$(chevron-down) ${modelTitle}`,
-      },
     ];
   }
 
@@ -402,7 +394,7 @@ export class QuickEdit {
     label: QuickEditInitialItemLabels | undefined;
     value: string | undefined;
   }> {
-    const modelTitle = await this.getCurModelTitle();
+    const modelTitle = await this.getCurModel();
 
     if (!modelTitle) {
       this.ide.showToast("error", "Please configure a model to use Quick Edit");
@@ -411,7 +403,7 @@ export class QuickEdit {
 
     const quickPick = vscode.window.createQuickPick();
 
-    const initialItems = this.getInitialItems(modelTitle);
+    const initialItems = this.getInitialItems();
     quickPick.items = initialItems;
     quickPick.placeholder =
       "Enter a prompt to edit your code (@ to search files, ⏎ to submit)";
@@ -484,14 +476,12 @@ export class QuickEdit {
           // search character to the end of the string
           const searchQuery = value.substring(lastAtIndex + 1);
 
-          const searchResults = this.miniSearch.search(
-            searchQuery,
-          ) as unknown as FileMiniSearchResult[];
+          const searchResults = this.fileSearch.search(searchQuery);
 
           if (searchResults.length > 0) {
             quickPick.items = searchResults
-              .map(({ filename }) => ({
-                label: filename,
+              .map(({ relativePath }) => ({
+                label: relativePath,
                 alwaysShow: true,
               }))
               .slice(0, QuickEdit.maxFileSearchResults);
@@ -560,7 +550,7 @@ export class QuickEdit {
     editor: vscode.TextEditor;
     params: QuickEditShowParams | undefined;
   }) {
-    const config = await this.configHandler.loadConfig();
+    const { config } = await this.configHandler.loadConfig();
     if (!config) {
       throw new Error("Config not loaded");
     }
@@ -585,14 +575,14 @@ export class QuickEdit {
         break;
 
       case QuickEditInitialItemLabels.Model:
-        const curModelTitle = await this.getCurModelTitle();
+        const curModel = await this.getCurModel();
 
-        if (!curModelTitle) {
+        if (!curModel) {
           break;
         }
 
         const selectedModelTitle = await getModelQuickPickVal(
-          curModelTitle,
+          curModel.model,
           config,
         );
 

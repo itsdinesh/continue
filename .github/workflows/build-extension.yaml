@@ -1,6 +1,9 @@
 name: Build Extension
 
 on:
+  push:
+    branches:
+      - quickpick-main
   workflow_dispatch:
 
 jobs:
