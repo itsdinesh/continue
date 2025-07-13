@@ -377,7 +377,7 @@ export class QuickEdit {
     });
   }
 
-  private getInitialItems(): vscode.QuickPickItem[] {
+  private getInitialItems(modelTitle: string): vscode.QuickPickItem[] {
     return [
       {
         label: QuickEditInitialItemLabels.History,
@@ -387,6 +387,10 @@ export class QuickEdit {
         label: QuickEditInitialItemLabels.ContextProviders,
         detail: "$(add) Add context to your prompt",
       },
+      {
+        label: QuickEditInitialItemLabels.Model,
+        detail: `$(chevron-down) ${modelTitle}`,
+      },
     ];
   }
 
@@ -394,16 +398,16 @@ export class QuickEdit {
     label: QuickEditInitialItemLabels | undefined;
     value: string | undefined;
   }> {
-    const modelTitle = await this.getCurModel();
-
-    if (!modelTitle) {
+    const currentModel = await this.getCurModel();
+;
+    if (!currentModel) {
       this.ide.showToast("error", "Please configure a model to use Quick Edit");
       return { label: undefined, value: undefined };
     }
 
     const quickPick = vscode.window.createQuickPick();
 
-    const initialItems = this.getInitialItems();
+    const initialItems = this.getInitialItems(currentModel.model);
     quickPick.items = initialItems;
     quickPick.placeholder =
       "Enter a prompt to edit your code (@ to search files, ⏎ to submit)";
