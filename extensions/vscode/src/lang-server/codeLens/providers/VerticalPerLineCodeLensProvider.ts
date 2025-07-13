@@ -43,7 +43,7 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
       if (codeLenses.length === 0) {
         codeLenses.push(
           new vscode.CodeLens(range, {
-            title: `Accept All`,
+            title: `✔ Accept All`,
             command: "continue.acceptDiff",
           }),
           new vscode.CodeLens(range, {
@@ -51,7 +51,7 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
             command: "continue.quickEdit",
           }),
           new vscode.CodeLens(range, {
-            title: `Reject All`,
+            title: `✘ Reject All`,
             command: "continue.rejectDiff",
           }),
         );
