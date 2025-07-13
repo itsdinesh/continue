@@ -223,7 +223,7 @@ const getCommandsMap: (
     // Passthrough for telemetry purposes
     "continue.defaultQuickAction": async (args: QuickEditShowParams) => {
       captureCommandTelemetry("defaultQuickAction");
-      vscode.commands.executeCommand("continue.focusEdit", args);
+      vscode.commands.executeCommand("continue.quickEdit", args);
     },
     "continue.customQuickActionSendToChat": async (
       prompt: string,
@@ -346,6 +346,10 @@ const getCommandsMap: (
       captureCommandTelemetry("generateRule");
       focusGUI();
       void sidebar.webviewProtocol?.request("generateRule", undefined);
+    },
+    "continue.quickEdit": async (args: QuickEditShowParams) => {
+      captureCommandTelemetry("quickEdit");
+      quickEdit.show(args);
     },
     "continue.writeCommentsForCode": async () => {
       captureCommandTelemetry("writeCommentsForCode");

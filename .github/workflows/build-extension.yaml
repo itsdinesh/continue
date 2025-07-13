@@ -1,0 +1,71 @@
+name: Build Extension
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+          - os: windows-latest
+            platform: win32
+            arch: arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: armhf
+          - os: ubuntu-latest
+            platform: alpine
+            arch: x64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install core dependencies
+        run: |
+          cd ${{ github.workspace }}/core
+          npm ci
+
+      - name: Install extension dependencies
+        run: |
+          cd ${{ github.workspace }}/extensions/vscode
+          npm ci
+
+      - name: Prepackage the extension
+        run: |
+          cd ${{ github.workspace }}/extensions/vscode
+          npm run prepackage -- --target ${{ matrix.platform }}-${{ matrix.arch }}
+
+      - name: Re-install esbuild
+        run: |
+          cd extensions/vscode
+          npm install -f esbuild
+
+      - name: Package the extension
+        run: |
+          cd extensions/vscode
+          npx vsce package --no-dependencies --target ${{ matrix.platform }}-${{ matrix.arch }}
+
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.arch }}-vsix
+          path: extensions/vscode/*.vsix

@@ -1571,6 +1571,7 @@ export interface ContinueConfig {
   tools: Tool[];
   mcpServerStatuses: MCPServerStatus[];
   rules: RuleWithSource[];
+  models?: ILLM[];
   modelsByRole: Record<ModelRole, ILLM[]>;
   selectedModelByRole: Record<ModelRole, ILLM | null>;
   data?: DataDestination[];
