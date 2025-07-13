@@ -1070,7 +1070,7 @@ export abstract class BaseLLM implements ILLM {
                   model: this.model,
                   input: batch,
                 });
-                return result.data.map((chunk) => chunk.embedding);
+                return result.data.map((chunk: { embedding: number[] }) => chunk.embedding);
               }
 
               return await this._embed(batch);
@@ -1094,8 +1094,8 @@ export abstract class BaseLLM implements ILLM {
       // Standard OpenAI format
       if (results.data && Array.isArray(results.data)) {
         return results.data
-          .sort((a, b) => a.index - b.index)
-          .map((result) => result.relevance_score);
+          .sort((a: { index: number }, b: { index: number }) => a.index - b.index)
+          .map((result: { relevance_score: number }) => result.relevance_score);
       }
 
       throw new Error(

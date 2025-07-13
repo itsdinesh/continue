@@ -2,6 +2,7 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import os from "os";
 import path from "path";
+import { ILLM } from "../index.js";
 
 import {
   ConfigResult,
@@ -20,17 +21,15 @@ import {
   CustomContextProvider,
   EmbeddingsProviderDescription,
   IContextProvider,
-  IDE,
   IdeInfo,
   IdeSettings,
   IdeType,
-  ILLM,
   ILLMLogger,
   LLMOptions,
   ModelDescription,
   RerankerDescription,
   SerializedContinueConfig,
-  SlashCommandWithSource,
+  SlashCommandWithSource
 } from "..";
 import { getLegacyBuiltInSlashCommandFromDescription } from "../commands/slash/built-in-legacy";
 import { convertCustomCommandToSlashCommand } from "../commands/slash/customSlashCommand";
@@ -524,15 +523,16 @@ async function intermediateToFinalConfig({
 
   const continueConfig: ContinueConfig = {
     ...config,
+    models: models as ILLM[], // Ensure models property is set and typed as ILLM[]
     contextProviders,
     tools: await getToolsForIde(ide),
     mcpServerStatuses: [],
     slashCommands: [],
     modelsByRole: {
-      chat: models,
-      edit: models,
-      apply: models,
-      summarize: models,
+      chat: models.filter((m) => !!(m && typeof m === "object" && "providerName" in m)),
+      edit: models.filter((m) => !!(m && typeof m === "object" && "providerName" in m)),
+      apply: models.filter((m) => !!(m && typeof m === "object" && "providerName" in m)),
+      summarize: models.filter((m) => !!(m && typeof m === "object" && "providerName" in m)),
       autocomplete: [...tabAutocompleteModels],
       embed: newEmbedder ? [newEmbedder] : [],
       rerank: newReranker ? [newReranker] : [],
@@ -988,5 +988,5 @@ async function loadContinueConfigFromJson(
 export {
   finalToBrowserConfig,
   loadContinueConfigFromJson,
-  type BrowserSerializedContinueConfig,
+  type BrowserSerializedContinueConfig
 };
