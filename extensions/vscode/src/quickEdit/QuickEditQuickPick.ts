@@ -402,7 +402,7 @@ export class QuickEdit {
     });
   }
 
-  private getInitialItems(modelTitle: string): vscode.QuickPickItem[] {
+  private getInitialItems(modelTitle: string | null | undefined): vscode.QuickPickItem[] {
     return [
       {
         label: QuickEditInitialItemLabels.History,
@@ -424,11 +424,6 @@ export class QuickEdit {
     value: string | undefined;
   }> {
     const modelTitle = await this.getCurModelTitle();
-
-    if (!modelTitle) {
-      this.ide.showToast("error", "Please configure a model to use Quick Edit");
-      return { label: undefined, value: undefined };
-    }
 
     const quickPick = vscode.window.createQuickPick();
 
