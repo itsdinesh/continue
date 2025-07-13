@@ -1,7 +1,5 @@
-import { ModelProvider } from "core";
 import { HTMLInputTypeAttribute } from "react";
 import { ModelProviderTags } from "../../../components/modelSelection/utils";
-import { FREE_TRIAL_LIMIT_REQUESTS } from "../../../util/freeTrial";
 import { completionParamsInputs } from "./completionParamsInputs";
 import type { ModelPackage } from "./models";
 import { models } from "./models";
@@ -24,7 +22,7 @@ export interface InputDescriptor {
 export interface ProviderInfo {
   title: string;
   icon?: string;
-  provider: ModelProvider;
+  provider: string;
   description: string;
   longDescription?: string;
   tags?: ModelProviderTags[];
@@ -50,7 +48,7 @@ export const apiBaseInput: InputDescriptor = {
   required: false,
 };
 
-export const providers: Partial<Record<ModelProvider, ProviderInfo>> = {
+export const providers: Partial<Record<string, ProviderInfo>> = {
   openai: {
     title: "OpenAI",
     provider: "openai",
@@ -112,9 +110,119 @@ export const providers: Partial<Record<ModelProvider, ProviderInfo>> = {
       models.claude35Sonnet,
       models.claude3Opus,
       models.claude3Sonnet,
-      models.claude3Haiku,
+      models.claude35Haiku,
     ],
     apiKeyUrl: "https://console.anthropic.com/account/keys",
+  },
+  moonshot: {
+    title: "Moonshot",
+    provider: "moonshot",
+    description: "Use the Moonshot API for LLMs",
+    longDescription: `[Visit our documentation](https://docs.continue.dev/reference/Model%20Providers/moonshot) for information on obtaining an API key.`,
+    icon: "moonshot.png",
+    tags: [ModelProviderTags.RequiresApiKey],
+    refPage: "moonshot",
+    apiKeyUrl: "https://docs.moonshot.cn/docs/getting-started",
+    packages: [models.moonshotChat],
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API Key",
+        placeholder: "Enter your Moonshot API key",
+        required: true,
+      },
+      ...completionParamsInputsConfigs,
+    ],
+  },
+  "function-network": {
+    title: "Function Network",
+    provider: "function-network",
+    refPage: "function-network",
+    description:
+      "Run open-source models on Function Network. Private, Affordable User-Owned AI",
+    icon: "function-network.png",
+    longDescription: `Function Network is a private, affordable user-owned AI platform that allows you to run open-source models. Experience bleeding-edge Generative AI models with limitless scalability, all powered by our distributed inference network.`,
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    params: {
+      apiKey: "",
+    },
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API Key",
+        placeholder: "Enter your Function Network API key",
+        required: true,
+      },
+      ...completionParamsInputsConfigs,
+    ],
+    packages: [models.llama31Chat, models.deepseek],
+    apiKeyUrl: "https://function.network/join-waitlist",
+  },
+  ovhcloud: {
+    title: "OVHcloud",
+    provider: "ovhcloud",
+    refPage: "ovhcloud",
+    description:
+      "OVHcloud AI Endpoints is a serverless inference API that provides access to a curated selection of models (e.g., Llama, Mistral, Qwen, Deepseek). It is designed with security and data privacy in mind and is compliant with GDPR.",
+    longDescription: `To get started, create an API key on the OVHcloud [AI Endpoints website](https://endpoints.ai.cloud.ovh.net/). For more information, including pricing, visit the OVHcloud [AI Endpoints product page](https://www.ovhcloud.com/en/public-cloud/ai-endpoints/).`,
+    params: {
+      apiKey: "",
+    },
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API key",
+        placeholder: "Enter your AI Endpoints API key",
+        required: true,
+      },
+      ...completionParamsInputsConfigs,
+    ],
+    icon: "ovhcloud.png",
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    packages: [
+      models.llama318bChat,
+      models.llama3170bChat,
+      models.llama3370bChat,
+      models.codestralMamba,
+      models.mistralOs,
+      models.mistralNemo,
+      models.Qwen25Coder32b,
+      models.deepseekR1DistillLlama70B,
+    ],
+    apiKeyUrl: "https://endpoints.ai.cloud.ovh.net/",
+  },
+  scaleway: {
+    title: "Scaleway",
+    provider: "scaleway",
+    refPage: "scaleway",
+    description:
+      "Use the Scaleway Generative APIs to instantly access leading open models",
+    longDescription: `Hosted in European data centers, ideal for developers requiring low latency, full data privacy, and compliance with EU AI Act. You can generate your API key in [Scaleway's console](https://console.scaleway.com/generative-api/models). Get started:\n1. Create an API key [here](https://console.scaleway.com/iam/api-keys/)\n2. Paste below\n3. Select a model preset`,
+    params: {
+      apiKey: "",
+    },
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API key",
+        placeholder: "Enter your Scaleway API key",
+        required: true,
+      },
+      ...completionParamsInputsConfigs,
+    ],
+    icon: "scaleway.png",
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    packages: [
+      models.llama318bChat,
+      models.llama3170bChat,
+      models.mistralNemo,
+      models.Qwen25Coder32b,
+    ],
+    apiKeyUrl: "https://console.scaleway.com/iam/api-keys",
   },
   azure: {
     title: "Azure OpenAI",
@@ -241,7 +349,19 @@ Select the \`GPT-4o\` model below to complete your provider configuration, but n
       },
       ...completionParamsInputsConfigs,
     ],
-    packages: [models.commandR, models.commandRPlus],
+    packages: [
+      models.commandA032025,
+      models.commandR7BArabic022025,
+      models.commandR7B122024,
+      models.commandRPlus082024,
+      models.commandR082024,
+      models.commandRPlus042024,
+      models.commandR032024,
+      models.c4aiAyaVision32B,
+      models.c4aiAyaVision8B,
+      models.c4aiAyaExpanse32B,
+      models.c4aiAyaExpanse8B,
+    ],
     apiKeyUrl: "https://docs.cohere.com/v2/docs/rate-limits",
   },
   groq: {
@@ -267,7 +387,6 @@ Select the \`GPT-4o\` model below to complete your provider configuration, but n
       models.llama3170bChat,
       models.llama318bChat,
       { ...models.mixtralTrial, title: "Mixtral" },
-      models.llama270bChat,
       {
         ...models.AUTODETECT,
         params: {
@@ -296,7 +415,11 @@ Select the \`GPT-4o\` model below to complete your provider configuration, but n
         required: true,
       },
     ],
-    packages: [models.deepseekCoderApi, models.deepseekChatApi],
+    packages: [
+      models.deepseekCoderApi,
+      models.deepseekChatApi,
+      models.deepseekReasonerApi,
+    ],
     apiKeyUrl: "https://platform.deepseek.com/api_keys",
   },
   together: {
@@ -331,6 +454,72 @@ Select the \`GPT-4o\` model below to complete your provider configuration, but n
     }),
     apiKeyUrl: "https://api.together.xyz/settings/api-keys",
   },
+  ncompass: {
+    title: "nCompass",
+    provider: "ncompass",
+    refPage: "ncompass",
+    description:
+      "Use the nCompass API for extremely fast streaming of open-source models",
+    icon: "ncompass.png",
+    longDescription: `nCompass is an extremely fast inference engine for open-source language models. To get started, obtain an API key from [their console](https://app.ncompass.tech/api-settings).`,
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    params: {
+      apiKey: "",
+    },
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API Key",
+        placeholder: "Enter your nCompass API key",
+        required: true,
+      },
+      ...completionParamsInputsConfigs,
+    ],
+    packages: [
+      models.llama318bChat,
+      models.llama3370bChat,
+      models.Qwen25Coder32b,
+    ].map((p) => {
+      p.params.contextLength = 4096;
+      return p;
+    }),
+    apiKeyUrl: "https://app.ncompass.tech/api-settings",
+  },
+  novita: {
+    title: "NovitaAI",
+    provider: "novita",
+    refPage: "novita",
+    description:
+      "Use Novita AI API for extremely fast streaming of open-source models",
+    icon: "novita.png",
+    longDescription: `[Novita AI](https://novita.ai?utm_source=github_continuedev&utm_medium=github_readme&utm_campaign=github_link) offers an affordable, reliable, and simple inference platform with scalable [LLM APIs](https://novita.ai/docs/model-api/reference/introduction.html), empowering developers to build AI applications. To get started with Novita AI:\n1. Obtain an API key from [here](https://novita.ai/settings/key-management?utm_source=github_continuedev&utm_medium=github_readme&utm_campaign=github_link)\n2. Paste below\n3. Select a model preset`,
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    params: {
+      apiKey: "",
+    },
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API Key",
+        placeholder: "Enter your Novita AI API key",
+        required: true,
+      },
+      ...completionParamsInputsConfigs,
+    ],
+    packages: [
+      models.llama318BChat,
+      models.mistralChat,
+      models.deepseekR1Chat,
+      models.deepseekV3Chat,
+    ].map((p) => {
+      p.params.contextLength = 4096;
+      return p;
+    }),
+    apiKeyUrl:
+      "https://novita.ai/settings/key-management?utm_source=github_continuedev&utm_medium=github_readme&utm_campaign=github_link",
+  },
   gemini: {
     title: "Google Gemini API",
     provider: "gemini",
@@ -349,8 +538,37 @@ Select the \`GPT-4o\` model below to complete your provider configuration, but n
         required: true,
       },
     ],
-    packages: [models.gemini15Pro, models.geminiPro, models.gemini15Flash],
+    packages: [
+      models.gemini20Flash,
+      models.gemini20FlashLite,
+      models.gemini20FlashImageGeneration,
+      models.gemini25ProExp,
+      models.gemini15Pro,
+      models.geminiPro,
+      models.gemini15Flash,
+    ],
     apiKeyUrl: "https://aistudio.google.com/app/apikey",
+  },
+  xAI: {
+    title: "xAI",
+    provider: "xAI",
+    icon: "xAI.png",
+    description:
+      "xAI is a company working on building artificial intelligence to accelerate human scientific discovery",
+    longDescription:
+      "To get started with xAI, obtain an API key from their [console](https://console.x.ai/).",
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API Key",
+        placeholder: "Enter your xAI API key",
+        required: true,
+      },
+    ],
+    packages: [models.grokBeta],
+    apiKeyUrl: "https://console.x.ai/",
   },
   lmstudio: {
     title: "LM Studio",
@@ -541,41 +759,13 @@ To get started, [register](https://dataplatform.cloud.ibm.com/registration/stepo
       models.MetaLlama3,
     ],
   },
-  "free-trial": {
-    title: "Continue limited free trial",
-    provider: "free-trial",
-    refPage: "freetrial",
-    description:
-      "New users can try out Continue for free using a proxy server that securely makes calls to OpenAI, Anthropic, or Together using our API key",
-    longDescription: `New users can try out Continue for free using a proxy server that securely makes calls to OpenAI, Anthropic, or Together using our API key. If you are ready to set up a model for long-term use or have used all ${FREE_TRIAL_LIMIT_REQUESTS} free uses, you can enter your API key or use a local model.`,
-    icon: "openai.png",
-    tags: [ModelProviderTags.Free],
-    packages: [
-      models.llama31405bTrial,
-      models.llama3170bTrial,
-      { ...models.claude35Sonnet, title: "Claude 3.5 Sonnet (trial)" },
-      { ...models.gpt4o, title: "GPT-4o (trial)" },
-      { ...models.gpt35turbo, title: "GPT-3.5-Turbo (trial)" },
-      { ...models.claude3Haiku, title: "Claude 3 Haiku (trial)" },
-      models.mixtralTrial,
-      { ...models.gemini15Pro, title: "Gemini 1.5 Pro (trial)" },
-      {
-        ...models.AUTODETECT,
-        params: {
-          ...models.AUTODETECT.params,
-          title: "Free Trial",
-        },
-      },
-    ],
-    collectInputFor: [...completionParamsInputsConfigs],
-  },
   sambanova: {
-    title: "SambaNova Cloud",
+    title: "SambaNova",
     provider: "sambanova",
     refPage: "sambanova",
     description: "Use SambaNova Cloud for fast inference performance",
     icon: "sambanova.png",
-    longDescription: `The SambaNova Cloud is a cloud platform for running large AI models with the world record Llama 3.1 70B/405B performance. You can sign up [here](https://cloud.sambanova.ai/)`,
+    longDescription: `The SambaNova Cloud is a cloud platform for running large open source AI models with the world record performance and zero data retention. You can sign up [here](http://cloud.sambanova.ai?utm_source=continue&utm_medium=external&utm_campaign=cloud_signup)`,
     tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
     params: {
       apiKey: "",
@@ -590,10 +780,19 @@ To get started, [register](https://dataplatform.cloud.ibm.com/registration/stepo
       },
       ...completionParamsInputsConfigs,
     ],
-    packages: [models.llama31Chat].map((p) => {
-      p.params.contextLength = 4096;
-      return p;
-    }),
+    packages: [
+      models.llama4Scout,
+      models.llama4Maverick,
+      models.llama3370BInstruct,
+      models.llama318BInstruct,
+      models.llama31405BInstruct,
+      models.llama321BInstruct,
+      models.llama323BInstruct,
+      models.qwq32B,
+      models.deepseekR1DistillLlama70B,
+      models.deepseekR1,
+      models.deepseekV3,
+    ],
     apiKeyUrl: "https://cloud.sambanova.ai/apis",
   },
   cerebras: {
@@ -636,8 +835,7 @@ To get started, [register](https://dataplatform.cloud.ibm.com/registration/stepo
     packages: [
       models.VertexGemini15Pro,
       models.VertexGemini15Flash,
-      models.mistralLarge
-
+      models.mistralLarge,
     ],
     collectInputFor: [
       {
@@ -662,7 +860,7 @@ To get started, [register](https://dataplatform.cloud.ibm.com/registration/stepo
   askSage: {
     title: "Ask Sage",
     provider: "askSage",
-    icon: "ask-Sage.png",
+    icon: "ask-sage.png",
     description:
       "The Ask Sage API provides seamless access to LLMs including OpenAI, Anthropic, Meta, Mistral, and more.",
     longDescription: `To get access to the Ask Sage API, obtain your API key from the [Ask Sage platform](https://chat.asksage.ai/) for all other models.`,
@@ -689,14 +887,24 @@ To get started, [register](https://dataplatform.cloud.ibm.com/registration/stepo
       ...completionParamsInputsConfigs,
     ],
     packages: [
-      models.gpt4gov,
-      models.gpt4ogov,
+      models.asksagegpt4ogov,
+      models.asksagegpt4ominigov,
+      models.asksagegpt4gov,
+      models.asksagegpt35gov,
       models.gpt4o,
       models.gpt4omini,
+      models.asksagegpt4,
+      models.asksagegpt432,
+      models.asksagegpto1,
+      models.asksagegpto1mini,
       models.gpt35turbo,
+      models.asksageclaude35gov,
       models.claude35Sonnet,
       models.claude3Opus,
       models.claude3Sonnet,
+      models.grokBeta,
+      models.asksagegroqllama33,
+      models.asksagegroq70b,
       models.mistralLarge,
       models.llama370bChat,
       models.gemini15Pro,
@@ -706,7 +914,7 @@ To get started, [register](https://dataplatform.cloud.ibm.com/registration/stepo
   nebius: {
     title: "Nebius AI Studio",
     provider: "nebius",
-    refPage: "nebiusllm",
+    refPage: "nebius",
     description: "Use the Nebius API to run open-source models",
     longDescription: `Nebius AI Studio is a cheap hosted service with $100 trial. To get started with Nebius AI Studio:\n1. Obtain an API key from [here](https://studio.nebius.ai)\n2. Paste below\n3. Select a model preset`,
     params: {
@@ -724,7 +932,69 @@ To get started, [register](https://dataplatform.cloud.ibm.com/registration/stepo
     ],
     icon: "nebius.png",
     tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
-    packages: [models.MetaLlama3Large, models.Qwen2Coder],
+    packages: [
+      models.deepseekR1Chat,
+      models.deepseekV3Chat,
+      models.QwenQwQ_32b_preview,
+      models.Qwen25Coder_32b,
+      models.llama318bChat,
+      models.llama3170bChat,
+      models.llama31405bChat,
+      models.llama3170bNemotron,
+      models.mistral8x7b,
+      models.mistral8x22b,
+      models.mistralNemo,
+      models.phi3mini,
+      models.phi3medium,
+      models.gemma2_2b,
+      models.gemma2_9b,
+      models.Qwen2Coder,
+      models.deepseekCoder2Lite,
+      models.olmo7b,
+    ],
     apiKeyUrl: "https://studio.nebius.ai/settings/api-keys",
+  },
+  siliconflow: {
+    title: "SiliconFlow",
+    provider: "siliconflow",
+    icon: "siliconflow.png",
+    description: "SiliconFlow provides cheap open-source models.",
+    longDescription:
+      "To get started with SiliconFlow, obtain an API key from their website [here](https://cloud.siliconflow.cn/account/ak).",
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API Key",
+        placeholder: "Enter your SiliconFlow API key",
+        required: true,
+      },
+    ],
+    packages: [
+      models.QwenQwQ_32b_preview,
+      models.Qwen25Coder_32b,
+      models.Hunyuan_a52b,
+      models.Llama31Nemotron_70b,
+    ],
+    apiKeyUrl: "https://cloud.siliconflow.cn/account/ak",
+  },
+  venice: {
+    title: "Venice",
+    provider: "venice",
+    icon: "venice.png",
+    description: "Venice.",
+    tags: [ModelProviderTags.RequiresApiKey, ModelProviderTags.OpenSource],
+    collectInputFor: [
+      {
+        inputType: "text",
+        key: "apiKey",
+        label: "API Key",
+        placeholder: "Enter your Venice API key",
+        required: true,
+      },
+    ],
+    packages: [{ ...models.AUTODETECT }],
+    apiKeyUrl: "https://venice.ai/chat",
   },
 };

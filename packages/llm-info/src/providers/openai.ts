@@ -9,6 +9,12 @@ export const OpenAi: ModelProvider = {
       maxCompletionTokens: 4096,
     },
     {
+      model: "gpt-3.5-turbo-0613",
+      displayName: "GPT-3.5 Turbo",
+      contextLength: 16385,
+      maxCompletionTokens: 4096,
+    },
+    {
       model: "gpt-3.5-turbo-16k",
       displayName: "GPT-3.5 Turbo 16K",
       contextLength: 16384,
@@ -93,6 +99,13 @@ export const OpenAi: ModelProvider = {
     {
       model: "o1-mini",
       displayName: "o1 Mini",
+      contextLength: 128000,
+      maxCompletionTokens: 65536,
+      recommendedFor: ["chat"],
+    },
+    {
+      model: "o3-mini",
+      displayName: "o3 Mini",
       contextLength: 128000,
       maxCompletionTokens: 65536,
       recommendedFor: ["chat"],
