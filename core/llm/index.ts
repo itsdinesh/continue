@@ -587,7 +587,7 @@ export abstract class BaseLLM implements ILLM {
           signal,
         );
         for await (const chunk of stream) {
-          const result = fromChatCompletionChunk(chunk);
+          const result = fromChatCompletionChunk(chunk as any);
           if (result) {
             const content = renderChatMessage(result);
             const formattedContent = this._formatChatMessage(result);
@@ -886,7 +886,6 @@ export abstract class BaseLLM implements ILLM {
 
     return completionOptions;
   }
-
   async *streamChat(
     _messages: ChatMessage[],
     signal: AbortSignal,
@@ -944,15 +943,15 @@ export abstract class BaseLLM implements ILLM {
       } else {
         if (this.shouldUseOpenAIAdapter("streamChat") && this.openaiAdapter) {
           let body = toChatBody(messages, completionOptions);
-          body = this.modifyChatBody(body);
+          body = this.modifyChatBody(body as any);
 
           if (completionOptions.stream === false) {
             // Stream false
             const response = await this.openaiAdapter.chatCompletionNonStream(
-              { ...body, stream: false },
+              { ...body, stream: false } as any,
               signal,
             );
-            const msg = fromChatResponse(response);
+            const msg = fromChatResponse(response as any);
             yield msg;
             completion = this._formatChatMessage(msg);
           } else {
@@ -961,11 +960,11 @@ export abstract class BaseLLM implements ILLM {
               {
                 ...body,
                 stream: true,
-              },
+              } as any,
               signal,
             );
             for await (const chunk of stream) {
-              const result = fromChatCompletionChunk(chunk);
+              const result = fromChatCompletionChunk(chunk as any);
               if (result) {
                 completion += this._formatChatMessage(result);
                 interaction?.logItem({

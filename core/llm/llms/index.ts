@@ -178,7 +178,7 @@ export async function llmFromDescription(
     }
   }
 
-  return new cls(options);
+  return new cls(options) as BaseLLM;
 }
 
 export function llmFromProviderAndOptions(

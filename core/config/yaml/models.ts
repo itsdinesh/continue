@@ -143,7 +143,7 @@ async function modelConfigToBaseLLM({
     options.accountId = env.accountId;
   }
 
-  const llm = new cls(options);
+  const llm = new cls(options) as BaseLLM;
   return llm;
 }
 

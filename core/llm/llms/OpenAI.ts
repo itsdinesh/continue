@@ -236,8 +236,8 @@ class OpenAI extends BaseLLM {
   }
 
   protected modifyChatBody(
-    body: ChatCompletionCreateParams,
-  ): ChatCompletionCreateParams {
+    body: any,
+  ): any {
     body.stop = body.stop?.slice(0, this.getMaxStopWords());
 
     // OpenAI o1-preview and o1-mini or o3-mini:
