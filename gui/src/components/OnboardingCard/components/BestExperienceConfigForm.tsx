@@ -8,6 +8,7 @@ import { models } from "../../../pages/AddNewModel/configs/models";
 import { providers } from "../../../pages/AddNewModel/configs/providers";
 import { setDefaultModel } from "../../../redux/slices/stateSlice";
 import AddModelButtonSubtext from "../../AddModelButtonSubtext";
+import { ModelProvider } from "core";
 
 const { anthropic: chatProvider, mistral: autocompleteProvider } = providers;
 const {
@@ -35,21 +36,21 @@ function BestExperienceConfigForm({
 
     const chatModelConfig = {
       model: chatModel.params.model,
-      provider: chatProvider.provider,
+      provider: chatProvider.provider as ModelProvider,
       apiKey: chatApiKey,
       title: chatModel.params.title,
     };
 
     const repoMapConfig = {
       model: repoMapModel.params.model,
-      provider: chatProvider.provider,
+      provider: chatProvider.provider as ModelProvider,
       apiKey: chatApiKey,
       title: repoMapModel.params.title,
     };
 
     const autocompleteModelConfig = {
       title: autocompleteModel.params.title,
-      provider: autocompleteProvider.provider,
+      provider: autocompleteProvider.provider as ModelProvider,
       model: autocompleteModel.params.model,
       apiKey: autocompleteApiKey,
     };
