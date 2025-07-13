@@ -2,38 +2,53 @@ name: Build Extension
 
 on:
   workflow_dispatch:
+    inputs:
+      build-targets:
+        description: 'Select build targets'
+        required: true
+        type: choice
+        options:
+          - windows-x64
+          - windows-arm64
+          - linux-x64
+          - linux-arm64
+          - linux-armhf
+          - alpine-x64
+          - darwin-x64
+          - darwin-arm64
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ contains(github.event.inputs.build-targets, 'windows') && 'windows-latest' || contains(github.event.inputs.build-targets, 'darwin') && 'macos-latest' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            platform: win32
+          - platform: win32
             arch: x64
-          - os: windows-latest
-            platform: win32
+            target: windows-x64
+          - platform: win32
             arch: arm64
-          - os: ubuntu-latest
-            platform: linux
+            target: windows-arm64
+          - platform: linux
             arch: x64
-          - os: ubuntu-latest
-            platform: linux
+            target: linux-x64
+          - platform: linux
             arch: arm64
-          - os: ubuntu-latest
-            platform: linux
+            target: linux-arm64
+          - platform: linux
             arch: armhf
-          - os: ubuntu-latest
-            platform: alpine
+            target: linux-armhf
+          - platform: alpine
             arch: x64
-          - os: macos-13
-            platform: darwin
+            target: alpine-x64
+          - platform: darwin
             arch: x64
-          - os: macos-latest
-            platform: darwin
+            target: darwin-x64
+          - platform: darwin
             arch: arm64
+            target: darwin-arm64
+    if: contains(github.event.inputs.build-targets, matrix.target)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
