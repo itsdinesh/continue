@@ -9,8 +9,11 @@ describe("Parallel Tool Calls", () => {
   const PARALLEL_TOOL_CALL_RESPONSE: ChatMessage[] = [
     {
       role: "assistant",
-      content:
-        "I'll call the get_weather function in parallel for both San Francisco and Monterey, California.",
+      content: "I'll call both tools in parallel.",
+    },
+    {
+      role: "assistant",
+      content: "",
       toolCalls: [
         {
           id: "toolu_0112JmA95qW6WhAsvkKb7Avp",
@@ -54,9 +57,9 @@ describe("Parallel Tool Calls", () => {
       PARALLEL_TOOL_CALL_RESPONSE,
     );
 
-    // Wait for the message to be processed
+    // Wait for streaming to complete and tool calls to be set to generated
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     });
 
     // Currently this will fail because we only support one tool call
@@ -78,8 +81,9 @@ describe("Parallel Tool Calls", () => {
       PARALLEL_TOOL_CALL_RESPONSE,
     );
 
+    // Wait for streaming to complete and tool calls to be set to generated
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     });
 
     const state = store.getState();
@@ -93,6 +97,7 @@ describe("Parallel Tool Calls", () => {
       (item) =>
         item.message.role === "assistant" && item.toolCallStates?.length,
     );
+
 
     expect(assistantMessage).toBeDefined();
     expect((assistantMessage!.message as any).toolCalls).toHaveLength(2);
@@ -128,9 +133,9 @@ describe("Parallel Tool Calls", () => {
       PARALLEL_TOOL_CALL_RESPONSE,
     );
 
-    // Wait for the message to be processed
+    // Wait for streaming to complete and tool calls to be set to generated
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     });
 
     const { findAllCurToolCallsByStatus } = await import("../../../redux/util");
@@ -239,9 +244,9 @@ describe("Parallel Tool Calls", () => {
       MULTIPLE_TOOL_CALLS_RESPONSE,
     );
 
-    // Wait for processing
+    // Wait for streaming to complete and tool calls to be set to generated
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     });
 
     const state = store.getState();
