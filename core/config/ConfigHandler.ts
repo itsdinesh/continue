@@ -461,7 +461,7 @@ export class ConfigHandler {
       await this.currentProfile.reloadConfig(this.additionalContextProviders);
 
     this.notifyConfigListeners({ config, errors, configLoadInterrupted });
-    
+
     // Track config loading telemetry
     const endTime = performance.now();
     const duration = endTime - startTime;
@@ -471,7 +471,7 @@ export class ConfigHandler {
       totalConfigLoads: this.totalConfigLoads,
       configLoadInterrupted,
     });
-    
+
     return { config, errors, configLoadInterrupted };
   }
 
