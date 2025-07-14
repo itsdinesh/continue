@@ -21,7 +21,6 @@ import {
 import { setDialogMessage, setShowDialog } from "../../redux/slices/uiSlice";
 import { refreshSessionMetadata } from "../../redux/thunks/session";
 import { getFontSize, getPlatform } from "../../util";
-import { cn } from "../../util/cn";
 import { ROUTES } from "../../util/navigation";
 import ConfirmationDialog from "../dialogs/ConfirmationDialog";
 import { Button } from "../ui";
@@ -148,9 +147,11 @@ export function History() {
     <div
       style={{ fontSize: getFontSize() }}
       className="flex flex-1 flex-col overflow-auto px-1"
+      className="flex flex-1 flex-col overflow-auto px-1"
     >
       <div className="relative my-2 mt-4 flex justify-center space-x-2">
         <input
+          className="bg-vsc-input-background text-vsc-foreground flex-1 rounded-md border border-none py-1 pl-2 pr-8 text-sm outline-none focus:outline-none"
           className="bg-vsc-input-background text-vsc-foreground flex-1 rounded-md border border-none py-1 pl-2 pr-8 text-sm outline-none focus:outline-none"
           ref={searchInputRef}
           placeholder="Search past sessions"
@@ -170,6 +171,7 @@ export function History() {
           />
         )}
       </div>
+
       <div className="thin-scrollbar flex flex-1 flex-col overflow-y-auto">
         {filteredAndSortedSessions.length === 0 && (
           <div className="m-3 text-center">
@@ -190,10 +192,9 @@ export function History() {
             {sessionGroups.map((group, groupIndex) => (
               <Fragment key={group.label}>
                 <tr
-                  className={cn(
-                    "user-select-none sticky mb-3 ml-2 flex h-6 justify-start text-left text-base font-bold opacity-75",
-                    groupIndex === 0 ? "mt-2" : "mt-8",
-                  )}
+                  className={`user-select-none sticky mb-3 ml-2 flex h-6 justify-start text-left text-base font-bold opacity-75 ${
+                    groupIndex === 0 ? "mt-2" : "mt-8"
+                  }`}
                 >
                   <td colSpan={3}>{group.label}</td>
                 </tr>
@@ -209,6 +210,7 @@ export function History() {
           </tbody>
         </table>
       </div>
+
       <div className="border-border flex flex-col items-end justify-center border-0 border-t border-solid px-2 py-3 text-xs">
         <Button variant="secondary" size="sm" onClick={showClearSessionsDialog}>
           Clear chats
