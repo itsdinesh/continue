@@ -19,7 +19,6 @@ import {
   Session,
   SessionMetadata,
   Tool,
-  WarningMessage
 } from "core";
 import { NEW_SESSION_TITLE } from "core/util/constants";
 import {
@@ -29,9 +28,13 @@ import {
 import { findUriInDirs, getUriPathBasename } from "core/util/uri";
 import { findLastIndex } from "lodash";
 import { v4 as uuidv4 } from "uuid";
-import { toolCallCtxItemToCtxItemWithId } from "../../pages/gui/ToolCallDiv/utils";
+import { toolCallCtxItemToCtxItemWithId } from "../../pages/gui/ToolCallDiv/toolCallStateToContextItem";
+import { addToolCallDeltaToState } from "../../util/toolCallState";
 import { RootState } from "../store";
 import { streamResponseThunk } from "../thunks/streamResponse";
+import { findCurrentToolCall, findToolCall, findToolOutput } from "../util";
+
+const getIdeMessenger = () => (window as any).ideMessenger;
 
 // We need this to handle reorderings (e.g. a mid-array deletion) of the messages array.
 // The proper fix is adding a UUID to all chat messages, but this is the temp workaround.
@@ -129,18 +132,14 @@ export const sessionSlice = createSlice({
       let validAssistantMessageIdx = -1;
       for (let i = state.history.length - 1; i > lastUserOrToolIdx; i--) {
         const message = state.history[i];
-        const hasGeneratedMsg = message.toolCallStates?.some(
-          (toolCallState) => toolCallState.status !== "generating",
-        );
-        if (message.message.content || hasGeneratedMsg) {
+        if (
+          message.message.content ||
+          message.toolCallState?.status !== "generating"
+        ) {
           validAssistantMessageIdx = i;
           // Cancel any tool calls that are dangling and generated
-          if (message.toolCallStates) {
-            message.toolCallStates.forEach((toolCallState) => {
-              if (toolCallState.status === "generated") {
-                toolCallState.status = "canceled";
-              }
-            });
+          if (message.toolCallState?.status === "generated") {
+            message.toolCallState.status = "canceled";
           }
           break;
         }
@@ -389,7 +388,30 @@ export const sessionSlice = createSlice({
               lastItem = state.history[state.history.length - 1];
               lastMessage = lastItem.message;
 
-              handleToolCallsInMessage(message, lastItem);
+              if (
+                (message.role === "assistant" || message.role === "thinking") &&
+                message.toolCalls?.[0]
+              ) {
+                // Only support one tool call for now.
+                // There are further changes required throughout the system
+                // to support multiple tool calls in a single message from
+                // OpenAI-compatible providers.
+                const toolCallDelta = message.toolCalls[0];
+                const newToolCallState = addToolCallDeltaToState(
+                  toolCallDelta,
+                  lastItem.toolCallState,
+                );
+                lastItem.toolCallState = newToolCallState;
+                // We know this is one of these two types because we just added it
+                const curMessage = lastMessage as
+                  | AssistantChatMessage
+                  | ThinkingChatMessage;
+                if (curMessage.toolCalls) {
+                  curMessage.toolCalls.push(newToolCallState.toolCall);
+                } else {
+                  curMessage.toolCalls = [newToolCallState.toolCall];
+                }
+              }
 
               return;
             }
@@ -398,18 +420,31 @@ export const sessionSlice = createSlice({
           // The remainder of this function handles streaming messages
           if (
             lastMessage.role !== message.role ||
-            message.role === "tool" // Tool messages should always create new messages
+            // This is for when a tool call comes immediately before/after tool call
+            (lastMessage.role === "assistant" &&
+              message.role === "assistant" &&
+              // Last message isn't completely new
+              !(!lastMessage.toolCalls?.length && !lastMessage.content) &&
+              // And there's a difference in tool call presence
+              (lastMessage.toolCalls?.length ?? 0) !==
+                (message.toolCalls?.length ?? 0))
           ) {
             // Create a new message
             const historyItem: ChatHistoryItemWithMessageId = {
               message: {
                 ...message,
-                content: "", // Start with empty content, let accumulation logic handle it
+                content: "",
                 id: uuidv4(),
               },
               contextItems: [],
             };
-            handleToolCallsInMessage(message, historyItem);
+            if (message.role === "assistant" && message.toolCalls?.[0]) {
+              const toolCallDelta = message.toolCalls[0];
+              historyItem.toolCallState = addToolCallDeltaToState(
+                toolCallDelta,
+                undefined,
+              );
+            }
             state.history.push(historyItem);
             lastItem = state.history[state.history.length - 1];
             lastMessage = lastItem.message;
@@ -451,10 +486,17 @@ export const sessionSlice = createSlice({
             }
           } else if (
             message.role === "assistant" &&
-            message.toolCalls?.length &&
+            message.toolCalls?.[0] &&
             lastMessage.role === "assistant"
           ) {
-            handleStreamingToolCallUpdates(message, lastItem);
+            // Intentionally only supporting one tool call for now.
+            const toolCallDelta = message.toolCalls[0];
+            const newToolCallState = addToolCallDeltaToState(
+              toolCallDelta,
+              lastItem.toolCallState,
+            );
+            lastItem.toolCallState = newToolCallState;
+            lastMessage.toolCalls = [newToolCallState.toolCall];
           }
         }
       }
@@ -602,11 +644,10 @@ export const sessionSlice = createSlice({
         tools: Tool[];
       }>,
     ) => {
-      const toolCallState = findToolCallById(
+      const toolCallState = findToolCall(
         state.history,
         action.payload.toolCallId,
       );
-
       if (toolCallState) {
         toolCallState.status = "generated";
 
@@ -626,17 +667,14 @@ export const sessionSlice = createSlice({
       }>,
     ) => {
       // Update tool call state and corresponding tool output message
-      const toolCallState = findToolCallById(
+      const toolCallState = findToolCall(
         state.history,
         action.payload.toolCallId,
       );
       if (toolCallState) {
         toolCallState.output = action.payload.contextItems;
       }
-      const toolItem = findChatHistoryItemByToolCallId(
-        state.history,
-        action.payload.toolCallId,
-      );
+      const toolItem = findToolOutput(state.history, action.payload.toolCallId);
       if (toolItem) {
         toolItem.message.content = renderContextItems(
           action.payload.contextItems,
@@ -652,7 +690,7 @@ export const sessionSlice = createSlice({
         toolCallId: string;
       }>,
     ) => {
-      const toolCallState = findToolCallById(
+      const toolCallState = findToolCall(
         state.history,
         action.payload.toolCallId,
       );
@@ -666,7 +704,7 @@ export const sessionSlice = createSlice({
         toolCallId: string;
       }>,
     ) => {
-      const toolCallState = findToolCallById(
+      const toolCallState = findToolCall(
         state.history,
         action.payload.toolCallId,
       );
@@ -680,7 +718,7 @@ export const sessionSlice = createSlice({
         toolCallId: string;
       }>,
     ) => {
-      const toolCallState = findToolCallById(
+      const toolCallState = findToolCall(
         state.history,
         action.payload.toolCallId,
       );
@@ -694,7 +732,7 @@ export const sessionSlice = createSlice({
         toolCallId: string;
       }>,
     ) => {
-      const toolCallState = findToolCallById(
+      const toolCallState = findToolCall(
         state.history,
         action.payload.toolCallId,
       );
@@ -747,16 +785,23 @@ function addPassthroughCases(
 ) {
   thunks.forEach((thunk) => {
     builder
-      .addCase(thunk.fulfilled, (_state, _action) => {})
-      .addCase(thunk.rejected, (_state, _action) => {})
-      .addCase(thunk.pending, (_state, _action) => {});
+      .addCase(thunk.fulfilled, (state, action) => {})
+      .addCase(thunk.rejected, (state, action) => {})
+      .addCase(thunk.pending, (state, action) => {});
   });
 }
+
+export const selectCurrentToolCall = createSelector(
+  (store: RootState) => store.session.history,
+  (history) => {
+    return findCurrentToolCall(history);
+  },
+);
 
 export const selectApplyStateByStreamId = createSelector(
   [
     (state: RootState) => state.session.codeBlockApplyStates.states,
-    (_state: RootState, streamId?: string) => streamId,
+    (state: RootState, streamId?: string) => streamId,
   ],
   (states, streamId) => {
     return states.find((state) => state.streamId === streamId);
@@ -766,7 +811,7 @@ export const selectApplyStateByStreamId = createSelector(
 export const selectApplyStateByToolCallId = createSelector(
   [
     (state: RootState) => state.session.codeBlockApplyStates.states,
-    (_state: RootState, toolCallId?: string) => toolCallId,
+    (state: RootState, toolCallId?: string) => toolCallId,
   ],
   (states, toolCallId) => {
     if (toolCallId) {
