@@ -1289,7 +1289,6 @@ export interface ContinueUIConfig {
   codeWrap?: boolean;
   showSessionTabs?: boolean;
   autoAcceptEditToolDiffs?: boolean;
-  logEditingData?: boolean;
 }
 
 export interface ContextMenuConfig {
@@ -1441,11 +1440,6 @@ export interface ExperimentalConfig {
    * If enabled, will add the current file as context.
    */
   useCurrentFileAsContext?: boolean;
-
-  /**
-   * If enabled, will save data on the user's editing processes
-   */
-  logEditingData?: boolean;
 
   /**
    * If enabled, will enable next edit in place of autocomplete
