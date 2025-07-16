@@ -1,32 +1,41 @@
-import { ContinueConfig } from "core";
-import { QuickPickItem, window } from "vscode";
+import type { ContinueConfig } from "core";
+import { type QuickPickItem, window } from "vscode";
 
 export async function getModelQuickPickVal(
-  curModelTitle: string,
-  config: ContinueConfig,
+	curModelTitle: string,
+	config: ContinueConfig,
 ) {
-  const modelItems: QuickPickItem[] = (config.models ?? []).map((model) => {
-    const isCurModel = curModelTitle === model.title;
+	const modelItems: QuickPickItem[] = (config.models ?? [])
+		.filter((model) => model.title) // Only show models with titles
+		.map((model) => {
+			const isCurModel = curModelTitle === model.title;
 
-    return {
-      label: model.title
-        ? `${isCurModel ? "$(check)" : "     "} ${model.title}`
-        : "Model title not set",
-    };
-  });
+			return {
+				label: `${isCurModel ? "$(check)" : "     "} ${model.title}`,
+				description: model.underlyingProviderName || "",
+				detail: model.model || "",
+			};
+		});
 
-  const selectedItem = await window.showQuickPick(modelItems, {
-    title: "Models",
-    placeHolder: "Select a model",
-  });
+	if (modelItems.length === 0) {
+		window.showErrorMessage("No models found in configuration");
+		return undefined;
+	}
 
-  if (!selectedItem) {
-    return undefined;
-  }
+	const selectedItem = await window.showQuickPick(modelItems, {
+		title: "Models",
+		placeHolder: "Select a model",
+	});
 
-  const selectedModelTitle = (config.models ?? []).find(
-    (model) => model.title && selectedItem.label.includes(model.title),
-  )?.title;
+	if (!selectedItem) {
+		return undefined;
+	}
 
-  return selectedModelTitle;
+	// Extract the model title from the label (remove the check mark and spaces)
+	const selectedModelTitle = selectedItem.label.replace(
+		/^(\$\(check\)|     ) /,
+		"",
+	);
+
+	return selectedModelTitle;
 }

@@ -338,11 +338,8 @@ export class QuickEdit {
 
     return (
       getModelByRole(config, "inlineEdit")?.title ??
-      (await this.webviewProtocol.request(
-        "getDefaultModelTitle",
-        undefined,
-        false,
-      )) ??
+      config.selectedModelByRole.edit?.title ??
+      config.selectedModelByRole.chat?.title ??
       config.models?.[0]?.title
     );
   }
