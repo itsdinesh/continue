@@ -311,6 +311,15 @@ export class QuickEdit {
       return null;
     }
 
+    if (this._curModelTitle) {
+      const selectedModel = config.models?.find(
+        (m) => m.title === this._curModelTitle,
+      );
+      if (selectedModel) {
+        return selectedModel;
+      }
+    }
+
     return config.selectedModelByRole.edit ?? config.selectedModelByRole.chat;
   }
 
@@ -600,15 +609,11 @@ export class QuickEdit {
 
         break;
 
-      case QuickEditInitialItemLabels.Model:
+      case QuickEditInitialItemLabels.Model: {
         const curModelTitle = await this.getCurModelTitle();
 
-        if (!curModelTitle) {
-          break;
-        }
-
         const selectedModelTitle = await getModelQuickPickVal(
-          curModelTitle,
+          curModelTitle || "No model selected",
           config,
         );
 
@@ -616,10 +621,9 @@ export class QuickEdit {
           this._curModelTitle = selectedModelTitle;
         }
 
-        // Recurse back to let the user write their prompt
         this.initiateNewQuickPick(editor, params);
-
         break;
+      }
 
       case QuickEditInitialItemLabels.Submit:
         if (selectedValue) {
