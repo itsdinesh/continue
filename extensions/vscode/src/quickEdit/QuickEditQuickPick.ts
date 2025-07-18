@@ -324,18 +324,24 @@ export class QuickEdit {
    * Gets the model title the user has chosen, or their default model
    */
   private async getCurModelTitle() {
-    if (this._curModel) {
-      return this._curModel.title;
-    }
-
     const { config } = await this.configHandler.loadConfig();
     if (!config) {
       return null;
     }
 
-    // Prioritize the edit model selected in the sidebar
+    // Always prioritize the global edit model selected in the sidebar
+    // This ensures sidebar changes are immediately reflected
+    const globalEditModel = config.selectedModelByRole.edit?.title;
+
+    // If we have a local model selection and it differs from the global one,
+    // clear the local selection to sync with sidebar
+    if (this._curModel && this._curModel.title !== globalEditModel) {
+      this._curModel = undefined;
+    }
+
+    // Return the global edit model or fallback chain
     return (
-      config.selectedModelByRole.edit?.title ??
+      globalEditModel ??
       config.selectedModelByRole.chat?.title ??
       getModelByRole(config, "inlineEdit")?.title ??
       config.models?.[0]?.title
