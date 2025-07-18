@@ -15,7 +15,18 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
       string,
       VerticalDiffCodeLens[]
     >,
-  ) {}
+  ) { }
+
+  private getCursorPosition(document: vscode.TextDocument): vscode.Position | null {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor || activeEditor.document.uri.toString() !== document.uri.toString()) {
+      return null;
+    }
+
+    // Get the primary cursor position (first selection)
+    const selection = activeEditor.selection;
+    return selection.active;
+  }
 
   public provideCodeLenses(
     document: vscode.TextDocument,
@@ -23,12 +34,43 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
   ): vscode.CodeLens[] | Thenable<vscode.CodeLens[]> {
     const uri = document.uri.toString();
     const blocks = this.editorToVerticalDiffCodeLens.get(uri);
+    const codeLenses: vscode.CodeLens[] = [];
 
-    if (!blocks) {
-      return [];
+    // Add CodeLenses at cursor position
+    const cursorPosition = this.getCursorPosition(document);
+    if (cursorPosition) {
+      const cursorRange = new vscode.Range(cursorPosition, cursorPosition);
+
+      codeLenses.push(
+        new vscode.CodeLens(cursorRange, {
+          title: `✔ Accept All`,
+          command: "continue.acceptDiff",
+        }),
+        new vscode.CodeLens(cursorRange, {
+          title: `Edit & Retry`,
+          command: "continue.quickEdit",
+        }),
+        new vscode.CodeLens(cursorRange, {
+          title: `✘ Reject All`,
+          command: "continue.rejectDiff",
+        }),
+        new vscode.CodeLens(cursorRange, {
+          title: `Accept`,
+          command: "continue.acceptVerticalDiffBlock",
+          arguments: [uri, 0], // Using 0 as default block index for cursor position
+        }),
+        new vscode.CodeLens(cursorRange, {
+          title: `Reject`,
+          command: "continue.rejectVerticalDiffBlock",
+          arguments: [uri, 0], // Using 0 as default block index for cursor position
+        }),
+      );
     }
 
-    const codeLenses: vscode.CodeLens[] = [];
+    // Add existing diff-related CodeLenses
+    if (!blocks) {
+      return codeLenses;
+    }
 
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
@@ -38,22 +80,22 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
         start.translate(block.numGreen + block.numRed),
       );
 
-      if (codeLenses.length === 0) {
-        codeLenses.push(
-          new vscode.CodeLens(range, {
-            title: `✔ Accept All`,
-            command: "continue.acceptDiff",
-          }),
-          new vscode.CodeLens(range, {
-            title: `Edit & Retry`,
-            command: "continue.quickEdit",
-          }),
-          new vscode.CodeLens(range, {
-            title: `✘ Reject All`,
-            command: "continue.rejectDiff",
-          }),
-        );
-      }
+      // if (codeLenses.length === 5) { // Only add these once (after cursor CodeLenses)
+      //   codeLenses.push(
+      //     new vscode.CodeLens(range, {
+      //       title: `✔ Accept All`,
+      //       command: "continue.acceptDiff",
+      //     }),
+      //     new vscode.CodeLens(range, {
+      //       title: `Edit & Retry`,
+      //       command: "continue.quickEdit",
+      //     }),
+      //     new vscode.CodeLens(range, {
+      //       title: `✘ Reject All`,
+      //       command: "continue.rejectDiff",
+      //     }),
+      //   );
+      // }
 
       codeLenses.push(
         new vscode.CodeLens(range, {
