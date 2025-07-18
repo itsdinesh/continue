@@ -115,6 +115,11 @@ export class QuickEdit {
    */
   private _curModel?: ILLM;
 
+  /**
+   * Stores the current quick pick instance for real-time updates
+   */
+  private _currentQuickPick?: vscode.QuickPick<vscode.QuickPickItem>;
+
   constructor(
     private readonly verticalDiffManager: VerticalDiffManager,
     private readonly configHandler: ConfigHandler,
@@ -436,6 +441,7 @@ export class QuickEdit {
     const modelTitle = await this.getCurModelTitle();
 
     const quickPick = vscode.window.createQuickPick();
+    this._currentQuickPick = quickPick; // Store reference for real-time updates
 
     const initialItems = this.getInitialItems(modelTitle);
     quickPick.items = initialItems;
@@ -445,11 +451,19 @@ export class QuickEdit {
     quickPick.ignoreFocusOut = true;
     quickPick.value = this.initialPrompt ?? "";
 
+    // Set up real-time config monitoring
+    this.setupConfigMonitoring();
     quickPick.show();
 
     quickPick.onDidChangeValue((value) =>
       this.handleQuickPickChange({ value, quickPick, initialItems }),
     );
+
+    // Clean up when quick pick is disposed
+    quickPick.onDidHide(() => {
+      this._currentQuickPick = undefined;
+    });
+
     /**
      * Waits for the user to select an item from the quick pick.
      *
@@ -668,6 +682,58 @@ export class QuickEdit {
     }
 
     return prompt;
+  }
+
+  /**
+   * Sets up real-time monitoring of config changes to update the Quick Pick UI
+   */
+  private setupConfigMonitoring() {
+    if (!this._currentQuickPick) return;
+
+    // Monitor config changes and update the UI in real-time
+    const configWatcher = setInterval(async () => {
+      if (!this._currentQuickPick) {
+        clearInterval(configWatcher);
+        return;
+      }
+
+      try {
+        const currentModelTitle = await this.getCurModelTitle();
+        const currentItems = this._currentQuickPick.items;
+
+        // Find the Model item in the current items
+        const modelItemIndex = currentItems.findIndex(
+          (item) => item.label === QuickEditInitialItemLabels.Model,
+        );
+
+        if (modelItemIndex !== -1) {
+          const currentModelItem = currentItems[modelItemIndex];
+          const expectedDetail = `$(chevron-down) ${
+            currentModelTitle || "No model selected"
+          }`;
+
+          // Only update if the model title has changed
+          if (currentModelItem.detail !== expectedDetail) {
+            const updatedItems = [...currentItems];
+            updatedItems[modelItemIndex] = {
+              ...currentModelItem,
+              detail: expectedDetail,
+            };
+
+            // Update the Quick Pick items to reflect the new model
+            this._currentQuickPick.items = updatedItems;
+          }
+        }
+      } catch (error) {
+        // Silently handle errors to avoid disrupting the user experience
+        console.warn("Error updating Quick Pick model title:", error);
+      }
+    }, 500); // Check every 500ms for config changes
+
+    // Clean up the watcher when Quick Pick is disposed
+    this._currentQuickPick.onDidHide(() => {
+      clearInterval(configWatcher);
+    });
   }
 
   /**
