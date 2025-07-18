@@ -9,23 +9,37 @@ export async function getModelQuickPickVal(
 	curModelTitle: string,
 	config: ContinueConfig,
 ) {
-	// Get all models from the config - models should be in config.models array
-	let allModels = config.models ?? [];
+	// Get all models from config.models (primary source)
+	const configModels = config.models ?? [];
 	
-	// If no models in config.models, try to collect from selectedModelByRole
-	if (allModels.length === 0) {
-		const roleModels = [];
-		if (config.selectedModelByRole?.chat) roleModels.push(config.selectedModelByRole.chat);
-		if (config.selectedModelByRole?.edit) roleModels.push(config.selectedModelByRole.edit);
-		if (config.selectedModelByRole?.apply) roleModels.push(config.selectedModelByRole.apply);
-		if (config.selectedModelByRole?.autocomplete) roleModels.push(config.selectedModelByRole.autocomplete);
-		if (config.selectedModelByRole?.embed) roleModels.push(config.selectedModelByRole.embed);
-		
-		// Remove duplicates based on title
-		allModels = roleModels.filter((model, index, arr) => 
-			arr.findIndex(m => m.title === model.title) === index
-		);
-	}
+	// Also collect models from selectedModelByRole (additional source)
+	const roleModels = [
+		config.selectedModelByRole?.chat,
+		config.selectedModelByRole?.edit,
+		config.selectedModelByRole?.apply,
+		config.selectedModelByRole?.autocomplete,
+		config.selectedModelByRole?.embed,
+	].filter((model): model is any => model != null);
+	
+	// Combine both sources and remove duplicates based on title
+	const allModelsMap = new Map();
+	
+	// Add config.models first (primary source)
+	configModels.forEach(model => {
+		if (model.title) {
+			allModelsMap.set(model.title, model);
+		}
+	});
+	
+	// Add role models (secondary source, won't overwrite existing)
+	roleModels.forEach(model => {
+		if (model.title && !allModelsMap.has(model.title)) {
+			allModelsMap.set(model.title, model);
+		}
+	});
+	
+	// Convert map back to array
+	let allModels = Array.from(allModelsMap.values());
 	
 	// Filter out transformers.js models and models without titles
 	allModels = allModels.filter(model => {
