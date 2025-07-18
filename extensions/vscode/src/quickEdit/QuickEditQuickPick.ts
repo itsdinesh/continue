@@ -618,25 +618,10 @@ export class QuickEdit {
         );
 
         if (selectedModelTitle) {
-          // Find the actual model object from the fresh config
-          let selectedModel = freshConfig.models?.find(
+          // Find the selected model from the edit models list
+          const selectedModel = freshConfig.modelsByRole?.edit?.find(
             (m) => m.title === selectedModelTitle,
           );
-
-          // If not found in config.models, try selectedModelByRole
-          if (!selectedModel) {
-            const roleModels = [
-              freshConfig.selectedModelByRole?.chat,
-              freshConfig.selectedModelByRole?.edit,
-              freshConfig.selectedModelByRole?.apply,
-              freshConfig.selectedModelByRole?.autocomplete,
-              freshConfig.selectedModelByRole?.embed,
-            ].filter((model): model is ILLM => model != null);
-
-            selectedModel = roleModels.find(
-              (m) => m.title === selectedModelTitle,
-            );
-          }
 
           if (selectedModel) {
             this._curModel = selectedModel;
