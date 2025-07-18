@@ -176,11 +176,11 @@ export class VerticalDiffHandler implements vscode.Disposable {
 
       const myersDiffs = await this.reapplyWithMyersDiff(diffLines);
 
-      // Scroll to the first diff
-      const scrollToLine =
-        this.getFirstChangedLine(myersDiffs) ?? this.startLine;
-      const range = new vscode.Range(scrollToLine, 0, scrollToLine, 0);
-      this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
+      // Disabled auto-scrolling to first diff to keep cursor position stable during inline edit
+      // const scrollToLine =
+      //   this.getFirstChangedLine(myersDiffs) ?? this.startLine;
+      // const range = new vscode.Range(scrollToLine, 0, scrollToLine, 0);
+      // this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
 
       this.options.onStatusUpdate(
         "done",
@@ -425,13 +425,14 @@ export class VerticalDiffHandler implements vscode.Disposable {
   private incrementCurrentLineIndex() {
     this.currentLineIndex++;
     this.updateIndexLineDecorations();
-    const range = new vscode.Range(
-      this.currentLineIndex,
-      0,
-      this.currentLineIndex,
-      0,
-    );
-    this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
+    // Disabled auto-scrolling during inline edit to keep cursor position stable
+    // const range = new vscode.Range(
+    //   this.currentLineIndex,
+    //   0,
+    //   this.currentLineIndex,
+    //   0,
+    // );
+    // this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
   }
 
   private async insertTextAboveLine(index: number, text: string) {
