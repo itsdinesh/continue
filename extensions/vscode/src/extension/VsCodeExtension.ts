@@ -244,6 +244,7 @@ export class VsCodeExtension {
       this.ide,
       context,
       this.fileSearch,
+      this.core,
     );
 
     // LLM Log view

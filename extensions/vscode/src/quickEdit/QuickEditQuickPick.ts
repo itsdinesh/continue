@@ -2,6 +2,7 @@
 import { IDE, ILLM, RuleWithSource } from "core";
 import { ConfigHandler } from "core/config/ConfigHandler";
 import { getModelByRole } from "core/config/util";
+import { Core } from "core/core";
 import { DataLogger } from "core/data/log";
 import { walkDir } from "core/indexing/walkDir";
 import { Telemetry } from "core/util/posthog";
@@ -121,6 +122,7 @@ export class QuickEdit {
     private readonly ide: IDE,
     private readonly context: vscode.ExtensionContext,
     private readonly fileSearch: FileSearch,
+    private readonly core: Core,
   ) {
     this.initializeFileSearchState();
   }
@@ -624,7 +626,18 @@ export class QuickEdit {
           );
 
           if (selectedModel) {
+            // Store locally for this Quick Edit session
             this._curModel = selectedModel;
+
+            // Update the global config to sync with sidebar - same as sidebar does
+            if (this.configHandler.currentProfile?.profileDescription.id) {
+              await this.core.invoke("config/updateSelectedModel", {
+                profileId: this.configHandler.currentProfile.profileDescription.id,
+                role: "edit",
+                model: selectedModel,
+              });
+            }
+
             this.ide.showToast(
               "info",
               `Switched to model: ${selectedModelTitle}`,
