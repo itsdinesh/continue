@@ -331,10 +331,11 @@ export class QuickEdit {
       return null;
     }
 
+    // Prioritize the edit model selected in the sidebar
     return (
-      getModelByRole(config, "inlineEdit")?.title ??
       config.selectedModelByRole.edit?.title ??
       config.selectedModelByRole.chat?.title ??
+      getModelByRole(config, "inlineEdit")?.title ??
       config.models?.[0]?.title
     );
   }
