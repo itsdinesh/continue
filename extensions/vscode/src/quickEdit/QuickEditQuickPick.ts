@@ -110,9 +110,9 @@ export class QuickEdit {
   private contextProviderStr?: string;
 
   /**
-   * Stores the current model title for potential changes
+   * Stores the current model for potential changes
    */
-  private _curModelTitle?: string;
+  private _curModel?: ILLM;
 
   constructor(
     private readonly verticalDiffManager: VerticalDiffManager,
@@ -303,7 +303,7 @@ export class QuickEdit {
   }
 
   /**
-   * Gets the model title the user has chosen, or their default model
+   * Gets the model the user has chosen, or their default model
    */
   private async getCurModel(): Promise<ILLM | null> {
     const { config } = await this.configHandler.loadConfig();
@@ -311,13 +311,8 @@ export class QuickEdit {
       return null;
     }
 
-    if (this._curModelTitle) {
-      const selectedModel = config.models?.find(
-        (m) => m.title === this._curModelTitle,
-      );
-      if (selectedModel) {
-        return selectedModel;
-      }
+    if (this._curModel) {
+      return this._curModel;
     }
 
     return config.selectedModelByRole.edit ?? config.selectedModelByRole.chat;
@@ -327,8 +322,8 @@ export class QuickEdit {
    * Gets the model title the user has chosen, or their default model
    */
   private async getCurModelTitle() {
-    if (this._curModelTitle) {
-      return this._curModelTitle;
+    if (this._curModel) {
+      return this._curModel.title;
     }
 
     const { config } = await this.configHandler.loadConfig();
@@ -615,7 +610,13 @@ export class QuickEdit {
         );
 
         if (selectedModelTitle) {
-          this._curModelTitle = selectedModelTitle;
+          // Find the actual model object from the config
+          const selectedModel = config.models?.find(
+            (m) => m.title === selectedModelTitle || m.model === selectedModelTitle,
+          );
+          if (selectedModel) {
+            this._curModel = selectedModel;
+          }
         }
 
         this.initiateNewQuickPick(editor, params);

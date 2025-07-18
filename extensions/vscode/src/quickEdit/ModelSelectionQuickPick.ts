@@ -1,19 +1,26 @@
 import type { ContinueConfig } from "core";
 import { type QuickPickItem, window } from "vscode";
 
+interface ModelQuickPickItem extends QuickPickItem {
+	model: any;
+}
+
 export async function getModelQuickPickVal(
 	curModelTitle: string,
 	config: ContinueConfig,
 ) {
-	const modelItems: QuickPickItem[] = (config.models ?? [])
-		.filter((model) => model.title) // Only show models with titles
-		.map((model) => {
-			const isCurModel = curModelTitle === model.title;
+	const modelItems: ModelQuickPickItem[] = (config.models ?? [])
+		.map((model, index) => {
+			// Use title if available, otherwise create a fallback title
+			const displayTitle = model.title || `${model.underlyingProviderName || "Unknown"} - ${model.model || `Model ${index + 1}`}`;
+			const isCurModel = curModelTitle === model.title || curModelTitle === displayTitle;
 
 			return {
-				label: `${isCurModel ? "$(check)" : "     "} ${model.title}`,
+				label: `${isCurModel ? "$(check)" : "     "} ${displayTitle}`,
 				description: model.underlyingProviderName || "",
 				detail: model.model || "",
+				// Store the actual model for retrieval
+				model: model,
 			};
 		});
 
@@ -31,11 +38,6 @@ export async function getModelQuickPickVal(
 		return undefined;
 	}
 
-	// Extract the model title from the label (remove the check mark and spaces)
-	const selectedModelTitle = selectedItem.label.replace(
-		/^(\$\(check\)|     ) /,
-		"",
-	);
-
-	return selectedModelTitle;
+	// Return the actual model title from the selected model
+	return selectedItem.model.title || selectedItem.model.model;
 }
