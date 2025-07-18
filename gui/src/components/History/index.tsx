@@ -1,12 +1,12 @@
 import { SessionMetadata } from "core";
 import MiniSearch from "minisearch";
 import React, {
-  Fragment,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    Fragment,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import Shortcut from "../gui/Shortcut";
 
@@ -15,8 +15,8 @@ import { useNavigate } from "react-router-dom";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import {
-  newSession,
-  setAllSessionMetadata,
+    newSession,
+    setAllSessionMetadata,
 } from "../../redux/slices/sessionSlice";
 import { setDialogMessage, setShowDialog } from "../../redux/slices/uiSlice";
 import { refreshSessionMetadata } from "../../redux/thunks/session";
@@ -147,11 +147,9 @@ export function History() {
     <div
       style={{ fontSize: getFontSize() }}
       className="flex flex-1 flex-col overflow-auto px-1"
-      className="flex flex-1 flex-col overflow-auto px-1"
     >
       <div className="relative my-2 mt-4 flex justify-center space-x-2">
         <input
-          className="bg-vsc-input-background text-vsc-foreground flex-1 rounded-md border border-none py-1 pl-2 pr-8 text-sm outline-none focus:outline-none"
           className="bg-vsc-input-background text-vsc-foreground flex-1 rounded-md border border-none py-1 pl-2 pr-8 text-sm outline-none focus:outline-none"
           ref={searchInputRef}
           placeholder="Search past sessions"

@@ -1,32 +1,35 @@
 import {
-  ActionReducerMapBuilder,
-  AsyncThunk,
-  PayloadAction,
-  createSelector,
-  createSlice,
+    ActionReducerMapBuilder,
+    AsyncThunk,
+    PayloadAction,
+    createSelector,
+    createSlice,
 } from "@reduxjs/toolkit";
 import { JSONContent } from "@tiptap/react";
 import {
-  ApplyState,
-  ChatHistoryItem,
-  ChatMessage,
-  ContextItem,
-  ContextItemWithId,
-  FileSymbolMap,
-  MessageModes,
-  PromptLog,
-  RuleWithSource,
-  Session,
-  SessionMetadata,
-  Tool,
-  ToolCallState,
-  ToolCallDelta,
+    ApplyState,
+    AssistantChatMessage,
+    ChatHistoryItem,
+    ChatMessage,
+    ContextItem,
+    ContextItemWithId,
+    FileSymbolMap,
+    MessageModes,
+    PromptLog,
+    RuleWithSource,
+    Session,
+    SessionMetadata,
+    ThinkingChatMessage,
+    Tool,
+    ToolCallDelta,
+    ToolCallState,
+    WarningMessage,
 } from "core";
 import { BuiltInToolNames } from "core/tools/builtIn";
 import { NEW_SESSION_TITLE } from "core/util/constants";
 import {
-  renderChatMessage,
-  renderContextItems,
+    renderChatMessage,
+    renderContextItems,
 } from "core/util/messageContent";
 import { findUriInDirs, getUriPathBasename } from "core/util/uri";
 import { findLastIndex } from "lodash";

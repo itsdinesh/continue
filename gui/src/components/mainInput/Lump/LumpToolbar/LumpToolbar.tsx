@@ -1,10 +1,9 @@
 import { useContext, useEffect } from "react";
-import { useSelector } from "react-redux";
 import { IdeMessengerContext } from "../../../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../../../redux/hooks";
 import {
-  selectFirstPendingToolCall,
-  selectPendingToolCalls,
+    selectFirstPendingToolCall,
+    selectPendingToolCalls,
 } from "../../../../redux/selectors/selectToolCalls";
 import { cancelToolCall } from "../../../../redux/slices/sessionSlice";
 import { callToolById } from "../../../../redux/thunks/callToolById";
@@ -38,7 +37,6 @@ const isCancelToolCallShortcut = (
 export function LumpToolbar() {
   const ideMessenger = useContext(IdeMessengerContext);
   const dispatch = useAppDispatch();
-  const ideMessenger = useContext(IdeMessengerContext);
   const ttsActive = useAppSelector((state) => state.ui.ttsActive);
   const isStreaming = useAppSelector((state) => state.session.isStreaming);
   const isInEdit = useAppSelector((state) => state.session.isInEdit);

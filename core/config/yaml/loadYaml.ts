@@ -1,29 +1,29 @@
 import {
-  AssistantUnrolled,
-  BLOCK_TYPES,
-  ConfigResult,
-  ConfigValidationError,
-  isAssistantUnrolledNonNullable,
-  MCPServer,
-  ModelRole,
-  PackageIdentifier,
-  RegistryClient,
-  Rule,
-  TEMPLATE_VAR_REGEX,
-  unrollAssistant,
-  validateConfigYaml,
+    AssistantUnrolled,
+    BLOCK_TYPES,
+    ConfigResult,
+    ConfigValidationError,
+    isAssistantUnrolledNonNullable,
+    MCPServer,
+    ModelRole,
+    PackageIdentifier,
+    RegistryClient,
+    Rule,
+    TEMPLATE_VAR_REGEX,
+    unrollAssistant,
+    validateConfigYaml,
 } from "@continuedev/config-yaml";
 import { dirname } from "node:path";
 
 import {
-  ContinueConfig,
-  ExperimentalMCPOptions,
-  IContextProvider,
-  IDE,
-  IdeInfo,
-  IdeSettings,
-  ILLMLogger,
-  RuleWithSource,
+    ContinueConfig,
+    ExperimentalMCPOptions,
+    IContextProvider,
+    IDE,
+    IdeInfo,
+    IdeSettings,
+    ILLMLogger,
+    RuleWithSource,
 } from "../..";
 import { MCPManagerSingleton } from "../../context/mcp/MCPManagerSingleton";
 import DocsContextProvider from "../../context/providers/DocsContextProvider";
@@ -235,8 +235,8 @@ async function configYamlToContinueConfig(options: {
     startUrl: doc.startUrl,
     rootUrl: doc.rootUrl,
     faviconUrl: doc.faviconUrl,
-    maxDepth: doc.maxDepth,
-    useLocalCrawling: doc.useLocalCrawling,
+    maxDepth: (doc as any).maxDepth,
+    useLocalCrawling: (doc as any).useLocalCrawling,
   }));
 
   config.mcpServers?.forEach((mcpServer) => {
