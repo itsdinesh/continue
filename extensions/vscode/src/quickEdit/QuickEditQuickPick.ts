@@ -415,7 +415,7 @@ export class QuickEdit {
       },
       {
         label: QuickEditInitialItemLabels.Model,
-        detail: `$(chevron-down) ${modelTitle}`,
+        detail: `$(chevron-down) ${modelTitle || "No model selected"}`,
       },
     ];
   }
@@ -602,20 +602,52 @@ export class QuickEdit {
         break;
 
       case QuickEditInitialItemLabels.Model: {
+        // Reload config to get latest models
+        const { config: freshConfig } = await this.configHandler.loadConfig();
+        if (!freshConfig) {
+          this.ide.showToast("error", "Failed to load configuration");
+          break;
+        }
+
         const curModelTitle = await this.getCurModelTitle();
 
         const selectedModelTitle = await getModelQuickPickVal(
           curModelTitle || "No model selected",
-          config,
+          freshConfig,
         );
 
         if (selectedModelTitle) {
-          // Find the actual model object from the config
-          const selectedModel = config.models?.find(
-            (m) => m.title === selectedModelTitle || m.model === selectedModelTitle,
+          // Find the actual model object from the fresh config
+          let selectedModel = freshConfig.models?.find(
+            (m) => m.title === selectedModelTitle,
           );
+
+          // If not found in config.models, try selectedModelByRole
+          if (!selectedModel) {
+            const roleModels = [
+              freshConfig.selectedModelByRole?.chat,
+              freshConfig.selectedModelByRole?.edit,
+              freshConfig.selectedModelByRole?.apply,
+              freshConfig.selectedModelByRole?.autocomplete,
+              freshConfig.selectedModelByRole?.embed,
+            ].filter((model): model is ILLM => model != null);
+
+            selectedModel = roleModels.find(
+              (m) => m.title === selectedModelTitle,
+            );
+          }
+
           if (selectedModel) {
             this._curModel = selectedModel;
+            this.ide.showToast(
+              "info",
+              `Switched to model: ${selectedModelTitle}`,
+            );
+          } else {
+            this.ide.showToast(
+              "error",
+              `Could not find model: ${selectedModelTitle}`,
+            );
           }
         }
 

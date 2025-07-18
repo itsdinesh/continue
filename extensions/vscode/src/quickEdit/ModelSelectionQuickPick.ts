@@ -27,19 +27,25 @@ export async function getModelQuickPickVal(
 		);
 	}
 	
+	// Filter out transformers.js models and models without titles
+	allModels = allModels.filter(model => {
+		const isTransformersJs = model.underlyingProviderName?.toLowerCase().includes('transformers') ||
+			model.model?.toLowerCase().includes('transformers') ||
+			model.title?.toLowerCase().includes('transformers');
+		return !isTransformersJs && model.title;
+	});
+	
 	if (allModels.length === 0) {
 		window.showErrorMessage("No models found in configuration. Please add models to your config.yaml file.");
 		return undefined;
 	}
 	
 	const modelItems: ModelQuickPickItem[] = allModels
-		.map((model, index) => {
-			// Use title if available, otherwise create a fallback title
-			const displayTitle = model.title || `${model.underlyingProviderName || "Unknown"} - ${model.model || `Model ${index + 1}`}`;
-			const isCurModel = curModelTitle === model.title || curModelTitle === displayTitle;
+		.map((model) => {
+			const isCurModel = curModelTitle === model.title;
 
 			return {
-				label: `${isCurModel ? "$(check)" : "     "} ${displayTitle}`,
+				label: `${isCurModel ? "$(check)" : "     "} ${model.title}`,
 				description: model.underlyingProviderName || "",
 				detail: model.model || "",
 				// Store the actual model for retrieval
@@ -56,6 +62,6 @@ export async function getModelQuickPickVal(
 		return undefined;
 	}
 
-	// Return the actual model title from the selected model
-	return selectedItem.model.title || selectedItem.model.model;
+	// Return the actual model title
+	return selectedItem.model.title;
 }
