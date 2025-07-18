@@ -9,7 +9,30 @@ export async function getModelQuickPickVal(
 	curModelTitle: string,
 	config: ContinueConfig,
 ) {
-	const modelItems: ModelQuickPickItem[] = (config.models ?? [])
+	// Get all models from the config - models should be in config.models array
+	let allModels = config.models ?? [];
+	
+	// If no models in config.models, try to collect from selectedModelByRole
+	if (allModels.length === 0) {
+		const roleModels = [];
+		if (config.selectedModelByRole?.chat) roleModels.push(config.selectedModelByRole.chat);
+		if (config.selectedModelByRole?.edit) roleModels.push(config.selectedModelByRole.edit);
+		if (config.selectedModelByRole?.apply) roleModels.push(config.selectedModelByRole.apply);
+		if (config.selectedModelByRole?.autocomplete) roleModels.push(config.selectedModelByRole.autocomplete);
+		if (config.selectedModelByRole?.embed) roleModels.push(config.selectedModelByRole.embed);
+		
+		// Remove duplicates based on title
+		allModels = roleModels.filter((model, index, arr) => 
+			arr.findIndex(m => m.title === model.title) === index
+		);
+	}
+	
+	if (allModels.length === 0) {
+		window.showErrorMessage("No models found in configuration. Please add models to your config.yaml file.");
+		return undefined;
+	}
+	
+	const modelItems: ModelQuickPickItem[] = allModels
 		.map((model, index) => {
 			// Use title if available, otherwise create a fallback title
 			const displayTitle = model.title || `${model.underlyingProviderName || "Unknown"} - ${model.model || `Model ${index + 1}`}`;
@@ -23,11 +46,6 @@ export async function getModelQuickPickVal(
 				model: model,
 			};
 		});
-
-	if (modelItems.length === 0) {
-		window.showErrorMessage("No models found in configuration");
-		return undefined;
-	}
 
 	const selectedItem = await window.showQuickPick(modelItems, {
 		title: "Models",
