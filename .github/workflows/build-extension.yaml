@@ -55,7 +55,7 @@ jobs:
       - name: Install core dependencies
         run: |
           cd ${{ github.workspace }}/core
-          npm ci
+          npm install
 
       - name: Install extension dependencies
         run: |
