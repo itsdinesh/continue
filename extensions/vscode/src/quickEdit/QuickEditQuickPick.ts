@@ -634,7 +634,7 @@ export class QuickEdit {
               await this.core.invoke("config/updateSelectedModel", {
                 profileId: this.configHandler.currentProfile.profileDescription.id,
                 role: "edit",
-                model: selectedModel,
+                title: selectedModel.title || null,
               });
             }
 
