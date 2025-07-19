@@ -23,7 +23,7 @@ export interface VerticalDiffCodeLens {
 }
 
 export class VerticalDiffManager {
-  public refreshCodeLens: () => void = () => {};
+  public refreshCodeLens: () => void = () => { };
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
   fileUriToCodeLens: Map<string, VerticalDiffCodeLens[]> = new Map();
@@ -187,14 +187,16 @@ export class VerticalDiffManager {
       block.numRed,
     );
 
-    if (blocks.length === 1) {
+    // Check if this was the last block
+    const remainingBlocks = this.fileUriToCodeLens.get(fileUri);
+    if (!remainingBlocks || remainingBlocks.length === 0) {
       this.clearForfileUri(fileUri, true);
     } else {
       // Re-enable listener for user changes to file
       this.enableDocumentChangeListener();
+      // Force refresh CodeLenses to update indices
+      this.refreshCodeLens();
     }
-
-    this.refreshCodeLens();
   }
 
   async streamDiffLines(

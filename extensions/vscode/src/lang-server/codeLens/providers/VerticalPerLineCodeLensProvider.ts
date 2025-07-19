@@ -60,16 +60,6 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
           title: `✘ Reject All`,
           command: "continue.rejectDiff",
         }),
-        new vscode.CodeLens(cursorRange, {
-          title: `Accept`,
-          command: "continue.acceptVerticalDiffBlock",
-          arguments: [uri, 0], // Using 0 as default block index for cursor position
-        }),
-        new vscode.CodeLens(cursorRange, {
-          title: `Reject`,
-          command: "continue.rejectVerticalDiffBlock",
-          arguments: [uri, 0], // Using 0 as default block index for cursor position
-        }),
       );
     }
 
