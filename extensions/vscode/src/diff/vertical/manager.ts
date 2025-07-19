@@ -475,10 +475,17 @@ export class VerticalDiffManager {
           abortController,
         });
 
+        // Collect all diff lines first instead of streaming them
+        const allDiffLines: DiffLine[] = [];
         for await (const line of stream) {
           if (line.type === "new" || line.type === "same") {
             streamedLines.push(line.line);
           }
+          allDiffLines.push(line);
+        }
+
+        // Now yield all lines at once to show the complete diff
+        for (const line of allDiffLines) {
           yield line;
         }
       }
