@@ -157,12 +157,16 @@ export class VerticalDiffManager {
       this.fileUriToHandler.delete(fileUri);
     }
 
-    // Clear the stored original cursor position
+    // Clear ALL stored state for this file
+    this.fileUriToCodeLens.delete(fileUri);
     this.fileUriToOriginalCursorPosition.delete(fileUri);
 
     this.disableDocumentChangeListener();
 
     vscode.commands.executeCommand("setContext", "continue.diffVisible", false);
+
+    // Force immediate CodeLens refresh to ensure Accept All/Edit & Retry/Reject All buttons disappear
+    this.forceRefreshCodeLenses();
   }
 
   async acceptRejectVerticalDiffBlock(
@@ -205,7 +209,23 @@ export class VerticalDiffManager {
     this.disableDocumentChangeListener();
 
     try {
-      // Accept/reject the block - skip the handler's automatic block management
+      // STEP 1: IMMEDIATELY update the state BEFORE doing anything else
+      // Remove the processed block from our array by UUID
+      const updatedBlocks = blocks.filter(b => b.id !== blockId);
+
+      // Update the blocks array immediately so CodeLens provider sees the change
+      if (updatedBlocks.length === 0) {
+        // All blocks processed - clear everything immediately
+        this.fileUriToCodeLens.delete(fileUri);
+        this.fileUriToOriginalCursorPosition.delete(fileUri);
+      } else {
+        this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+      }
+
+      // STEP 2: Force immediate CodeLens refresh with updated state
+      this.forceRefreshCodeLenses();
+
+      // STEP 3: Now perform the actual accept/reject operation
       await handler.acceptRejectBlock(
         accept,
         block.start,
@@ -214,31 +234,24 @@ export class VerticalDiffManager {
         true, // Skip status update, we'll handle it ourselves
       );
 
-      // Calculate the line offset caused by this operation
-      const lineOffset = accept ? -block.numRed : -block.numGreen;
+      // STEP 4: Update positions of remaining blocks after the operation
+      if (updatedBlocks.length > 0) {
+        // Calculate the line offset caused by this operation
+        const lineOffset = accept ? -block.numRed : -block.numGreen;
 
-      // Remove the processed block from our array by UUID
-      const updatedBlocks = blocks.filter(b => b.id !== blockId);
-
-      // Update the positions of remaining blocks that come after the processed block
-      for (let i = 0; i < updatedBlocks.length; i++) {
-        if (updatedBlocks[i].start > block.start) {
-          updatedBlocks[i] = {
-            ...updatedBlocks[i],
-            start: updatedBlocks[i].start + lineOffset,
-          };
+        // Update the positions of remaining blocks that come after the processed block
+        for (let i = 0; i < updatedBlocks.length; i++) {
+          if (updatedBlocks[i].start > block.start) {
+            updatedBlocks[i] = {
+              ...updatedBlocks[i],
+              start: updatedBlocks[i].start + lineOffset,
+            };
+          }
         }
-      }
 
-      // IMMEDIATELY update the blocks array to ensure CodeLens provider sees the change
-      if (updatedBlocks.length === 0) {
-        // All blocks processed - clear everything immediately
-        this.fileUriToCodeLens.delete(fileUri);
-        this.fileUriToOriginalCursorPosition.delete(fileUri);
-        this.clearForfileUri(fileUri, true);
-      } else {
-        // Update with remaining blocks
+        // Update the blocks array with corrected positions
         this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+
         // Re-enable listener for user changes to file
         this.enableDocumentChangeListener();
 
@@ -248,9 +261,12 @@ export class VerticalDiffManager {
           updatedBlocks.length,
           vscode.window.activeTextEditor?.document.getText(),
         );
+      } else {
+        // All blocks processed - clear everything
+        this.clearForfileUri(fileUri, true);
       }
 
-      // IMMEDIATE REFRESH: Force CodeLens to update instantly
+      // STEP 5: Final refresh to ensure everything is updated
       this.forceRefreshCodeLenses();
     } catch (error) {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);
