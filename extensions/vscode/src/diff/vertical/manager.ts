@@ -32,34 +32,13 @@ export class VerticalDiffManager {
   }
 
   private forceRefreshCodeLenses() {
-    // Immediately trigger refresh
-    this.refreshCodeLens();
-
-    // Force VS Code to refresh CodeLenses by triggering multiple refresh mechanisms
     const editor = vscode.window.activeTextEditor;
     if (editor) {
-      // Method 1: Trigger a micro cursor movement to force CodeLens refresh
-      const currentPosition = editor.selection.active;
-      const microMovement = currentPosition.translate(0, 1);
-      editor.selection = new vscode.Selection(microMovement, microMovement);
-
-      // Immediately move back and trigger refresh
-      setTimeout(() => {
-        editor.selection = new vscode.Selection(currentPosition, currentPosition);
-        this.refreshCodeLens();
-
-        // Method 2: Force document change event
-        setTimeout(() => {
-          // Trigger another refresh to ensure CodeLenses are updated
-          this.refreshCodeLens();
-
-          // Method 3: Force editor to re-evaluate by triggering a command
-          Promise.resolve(vscode.commands.executeCommand('editor.action.triggerSuggest')).then(() => {
-            return Promise.resolve(vscode.commands.executeCommand('hideSuggestWidget'));
-          }).catch(() => { });
-        }, 1);
-      }, 1);
+      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
     }
+
+    // Also trigger our own refresh mechanism
+    this.refreshCodeLens();
   }
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
@@ -272,33 +251,7 @@ export class VerticalDiffManager {
       }
 
       // IMMEDIATE REFRESH: Force CodeLens to update instantly
-      this.refreshCodeLens();
-
-      const editor = vscode.window.activeTextEditor;
-      if (editor && editor.document.uri.toString() === fileUri) {
-        // Force VS Code to refresh CodeLenses by moving cursor
-        const currentPos = editor.selection.active;
-
-        // Move cursor to force immediate CodeLens refresh
-        const tempPos = currentPos.translate(0, 1);
-        editor.selection = new vscode.Selection(tempPos, tempPos);
-        editor.selection = new vscode.Selection(currentPos, currentPos);
-
-        // Force immediate refresh after cursor movement
-        this.refreshCodeLens();
-
-        // Force multiple refreshes with different delays to ensure it takes effect
-        setTimeout(() => this.refreshCodeLens(), 0);
-        setTimeout(() => this.refreshCodeLens(), 1);
-        setTimeout(() => this.refreshCodeLens(), 5);
-        setTimeout(() => this.refreshCodeLens(), 10);
-        setTimeout(() => this.refreshCodeLens(), 20);
-        setTimeout(() => this.refreshCodeLens(), 50);
-        setTimeout(() => this.refreshCodeLens(), 100);
-        setTimeout(() => this.refreshCodeLens(), 200);
-        setTimeout(() => this.refreshCodeLens(), 500);
-        setTimeout(() => this.refreshCodeLens(), 1000);
-      }
+      this.forceRefreshCodeLenses();
     } catch (error) {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);
       // Re-enable listener even if there was an error
