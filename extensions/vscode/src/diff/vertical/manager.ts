@@ -209,23 +209,7 @@ export class VerticalDiffManager {
     this.disableDocumentChangeListener();
 
     try {
-      // STEP 1: IMMEDIATELY update the state BEFORE doing anything else
-      // Remove the processed block from our array by UUID
-      const updatedBlocks = blocks.filter(b => b.id !== blockId);
-
-      // Update the blocks array immediately so CodeLens provider sees the change
-      if (updatedBlocks.length === 0) {
-        // All blocks processed - clear everything immediately
-        this.fileUriToCodeLens.delete(fileUri);
-        this.fileUriToOriginalCursorPosition.delete(fileUri);
-      } else {
-        this.fileUriToCodeLens.set(fileUri, updatedBlocks);
-      }
-
-      // STEP 2: Force immediate CodeLens refresh with updated state
-      this.forceRefreshCodeLenses();
-
-      // STEP 3: Now perform the actual accept/reject operation
+      // Accept/reject the block - skip the handler's automatic block management
       await handler.acceptRejectBlock(
         accept,
         block.start,
@@ -234,24 +218,31 @@ export class VerticalDiffManager {
         true, // Skip status update, we'll handle it ourselves
       );
 
-      // STEP 4: Update positions of remaining blocks after the operation
-      if (updatedBlocks.length > 0) {
-        // Calculate the line offset caused by this operation
-        const lineOffset = accept ? -block.numRed : -block.numGreen;
+      // Calculate the line offset caused by this operation
+      const lineOffset = accept ? -block.numRed : -block.numGreen;
 
-        // Update the positions of remaining blocks that come after the processed block
-        for (let i = 0; i < updatedBlocks.length; i++) {
-          if (updatedBlocks[i].start > block.start) {
-            updatedBlocks[i] = {
-              ...updatedBlocks[i],
-              start: updatedBlocks[i].start + lineOffset,
-            };
-          }
+      // Remove the processed block from our array by UUID
+      const updatedBlocks = blocks.filter(b => b.id !== blockId);
+
+      // Update the positions of remaining blocks that come after the processed block
+      for (let i = 0; i < updatedBlocks.length; i++) {
+        if (updatedBlocks[i].start > block.start) {
+          updatedBlocks[i] = {
+            ...updatedBlocks[i],
+            start: updatedBlocks[i].start + lineOffset,
+          };
         }
+      }
 
-        // Update the blocks array with corrected positions
+      // IMMEDIATELY update the blocks array to ensure CodeLens provider sees the change
+      if (updatedBlocks.length === 0) {
+        // All blocks processed - clear everything immediately
+        this.fileUriToCodeLens.delete(fileUri);
+        this.fileUriToOriginalCursorPosition.delete(fileUri);
+        this.clearForfileUri(fileUri, true);
+      } else {
+        // Update with remaining blocks
         this.fileUriToCodeLens.set(fileUri, updatedBlocks);
-
         // Re-enable listener for user changes to file
         this.enableDocumentChangeListener();
 
@@ -261,12 +252,9 @@ export class VerticalDiffManager {
           updatedBlocks.length,
           vscode.window.activeTextEditor?.document.getText(),
         );
-      } else {
-        // All blocks processed - clear everything
-        this.clearForfileUri(fileUri, true);
       }
 
-      // STEP 5: Final refresh to ensure everything is updated
+      // IMMEDIATE REFRESH: Force CodeLens to update instantly
       this.forceRefreshCodeLenses();
     } catch (error) {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);
