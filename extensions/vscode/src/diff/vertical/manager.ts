@@ -179,22 +179,25 @@ export class VerticalDiffManager {
     // Disable listening to file changes while continue makes changes
     this.disableDocumentChangeListener();
 
-    // CodeLens object removed from editorToVerticalDiffCodeLens here
+    // Accept/reject the block
     await handler.acceptRejectBlock(
       accept,
       block.start,
       block.numGreen,
       block.numRed,
+      true, // Skip status update, we'll handle it here
     );
 
-    // Check if this was the last block
-    const remainingBlocks = this.fileUriToCodeLens.get(fileUri);
-    if (!remainingBlocks || remainingBlocks.length === 0) {
+    // Remove the processed block from our array manually to avoid index issues
+    blocks.splice(index, 1);
+    this.fileUriToCodeLens.set(fileUri, blocks);
+
+    if (blocks.length === 0) {
       this.clearForfileUri(fileUri, true);
     } else {
       // Re-enable listener for user changes to file
       this.enableDocumentChangeListener();
-      // Force refresh CodeLenses to update indices
+      // Force refresh CodeLenses with correct indices
       this.refreshCodeLens();
     }
   }
