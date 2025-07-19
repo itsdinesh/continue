@@ -15,8 +15,7 @@ interface FromConsoleView {
 const MAX_INTERACTIONS = 50;
 
 export class ContinueConsoleWebviewViewProvider
-  implements vscode.WebviewViewProvider
-{
+  implements vscode.WebviewViewProvider {
   public static readonly viewType = "continue.continueConsoleView";
 
   resolveWebviewView(
@@ -113,7 +112,7 @@ export class ContinueConsoleWebviewViewProvider
     while (
       this._completedInteractions.length > 0 &&
       this._completedInteractions.length + this._currentInteractions.size >
-        MAX_INTERACTIONS
+      MAX_INTERACTIONS
     ) {
       let toRemove = this._completedInteractions.shift();
       this._webview?.postMessage({
@@ -203,17 +202,16 @@ export class ContinueConsoleWebviewViewProvider
       <body>
         <div id="root"></div>
 
-        ${
-          inDevelopmentMode
-            ? `<script type="module">
+        ${inDevelopmentMode
+        ? `<script type="module">
           import RefreshRuntime from "http://localhost:5173/@react-refresh"
           RefreshRuntime.injectIntoGlobalHook(window)
           window.$RefreshReg$ = () => {}
           window.$RefreshSig$ = () => (type) => type
           window.__vite_plugin_react_preamble_installed__ = true
           </script>`
-            : ""
-        }
+        : ""
+      }
         <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
       </body>
     </html>`;

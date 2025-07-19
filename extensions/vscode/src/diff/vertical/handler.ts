@@ -50,6 +50,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
     ) => void,
     private readonly refreshCodeLens: () => void,
     public options: VerticalDiffHandlerOptions,
+    private readonly generateBlockId: () => string,
   ) {
     this.currentLineIndex = startLine;
     this.streamId = options.streamId;
@@ -354,6 +355,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
         numGreen++;
       } else if (diff.type === "same" && (numRed > 0 || numGreen > 0)) {
         codeLensBlocks.push({
+          id: this.generateBlockId(),
           numRed,
           numGreen,
           start: this.startLine + index - numRed - numGreen,
@@ -365,6 +367,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
 
     if (numRed > 0 || numGreen > 0) {
       codeLensBlocks.push({
+        id: this.generateBlockId(),
         numGreen,
         numRed,
         start: this.startLine + myersDiffs.length - numRed - numGreen,
@@ -382,6 +385,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
       const blocks = this.editorToVerticalDiffCodeLens.get(this.fileUri) || [];
 
       blocks.push({
+        id: this.generateBlockId(),
         start: this.currentLineIndex - this.insertedInCurrentBlock,
         numRed: this.deletionBuffer.length,
         numGreen: this.insertedInCurrentBlock,

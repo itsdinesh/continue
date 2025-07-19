@@ -39,12 +39,27 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
 
     // Only show CodeLenses if there are active diff blocks
     if (!blocks || blocks.length === 0) {
+      // No blocks means no CodeLenses at all - including Accept All/Edit & Retry/Reject All
       return codeLenses;
     }
 
-    // Add CodeLenses at original cursor position only when there are active diffs
+    // Validate that blocks actually contain valid data
+    const validBlocks = blocks.filter(block => 
+      block && 
+      typeof block.start === 'number' && 
+      typeof block.numGreen === 'number' && 
+      typeof block.numRed === 'number' &&
+      block.id
+    );
+
+    // If no valid blocks, return empty CodeLenses
+    if (validBlocks.length === 0) {
+      return codeLenses;
+    }
+
+    // Add CodeLenses at original cursor position ONLY when there are valid active diffs
     const originalCursorPosition = this.fileUriToOriginalCursorPosition.get(uri);
-    if (originalCursorPosition) {
+    if (originalCursorPosition && validBlocks.length > 0) {
       const cursorRange = new vscode.Range(originalCursorPosition, originalCursorPosition);
 
       codeLenses.push(
@@ -63,8 +78,8 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
       );
     }
 
-    for (let i = 0; i < blocks.length; i++) {
-      const block = blocks[i];
+    for (let i = 0; i < validBlocks.length; i++) {
+      const block = validBlocks[i];
       const start = new vscode.Position(block.start, 0);
       const range = new vscode.Range(
         start,
@@ -92,12 +107,12 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
         new vscode.CodeLens(range, {
           title: `Accept`,
           command: "continue.acceptVerticalDiffBlock",
-          arguments: [uri, i],
+          arguments: [uri, block.id],
         }),
         new vscode.CodeLens(range, {
           title: `Reject`,
           command: "continue.rejectVerticalDiffBlock",
-          arguments: [uri, i],
+          arguments: [uri, block.id],
         }),
       );
     }

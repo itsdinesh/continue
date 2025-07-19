@@ -17,6 +17,7 @@ import { editOutcomeTracker } from "../../extension/EditOutcomeTracker";
 import { VerticalDiffHandler, VerticalDiffHandlerOptions } from "./handler";
 
 export interface VerticalDiffCodeLens {
+  id: string;
   start: number;
   numRed: number;
   numGreen: number;
@@ -25,45 +26,30 @@ export interface VerticalDiffCodeLens {
 export class VerticalDiffManager {
   public refreshCodeLens: () => void = () => { };
 
+  // Generate a simple UUID for diff blocks
+  private generateBlockId(): string {
+    return 'block-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now().toString(36);
+  }
+
   private forceRefreshCodeLenses() {
-    // Immediate refresh
+    // Immediately trigger refresh
     this.refreshCodeLens();
 
-    // Force VS Code to refresh CodeLenses by triggering the provider refresh event
-    // This is more reliable than just calling refreshCodeLens()
-    Promise.resolve(vscode.commands.executeCommand('editor.action.refresh')).catch(() => {
-      // Command might not exist, ignore the error
-    });
+    // Force VS Code to refresh CodeLenses by triggering a selection change
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const currentSelection = editor.selection;
+      // Trigger a micro selection change to force CodeLens refresh
+      editor.selection = new vscode.Selection(
+        currentSelection.start.translate(0, 0),
+        currentSelection.end.translate(0, 0)
+      );
 
-    // Also trigger a CodeLens refresh command if available
-    Promise.resolve(vscode.commands.executeCommand('codelens.refresh')).catch(() => {
-      // Command might not exist, ignore the error
-    });
-
-    // Use process.nextTick if available (Node.js environment) for immediate execution
-    if (typeof process !== 'undefined' && process.nextTick) {
-      process.nextTick(() => {
+      // Immediate second refresh
+      setTimeout(() => {
         this.refreshCodeLens();
-      });
+      }, 1);
     }
-
-    // Use setImmediate if available (Node.js environment)
-    if (typeof setImmediate !== 'undefined') {
-      setImmediate(() => {
-        this.refreshCodeLens();
-      });
-    }
-
-    // Final fallback with timeout
-    setTimeout(() => {
-      this.refreshCodeLens();
-      // Double-check that the blocks were actually removed
-      const allBlocks = Array.from(this.fileUriToCodeLens.values()).flat();
-      if (allBlocks.length === 0) {
-        // If no blocks remain, ensure CodeLenses are cleared
-        Promise.resolve(vscode.commands.executeCommand('editor.action.refresh')).catch(() => { });
-      }
-    }, 100);
   }
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
@@ -102,6 +88,7 @@ export class VerticalDiffManager {
         this.clearForfileUri.bind(this),
         this.refreshCodeLens,
         options,
+        this.generateBlockId.bind(this),
       );
       this.fileUriToHandler.set(fileUri, handler);
       return handler;
@@ -192,7 +179,7 @@ export class VerticalDiffManager {
   async acceptRejectVerticalDiffBlock(
     accept: boolean,
     fileUri?: string,
-    index?: number,
+    blockId?: string,
   ) {
     if (!fileUri) {
       const activeEditor = vscode.window.activeTextEditor;
@@ -202,8 +189,9 @@ export class VerticalDiffManager {
       fileUri = activeEditor.document.uri.toString();
     }
 
-    if (typeof index === "undefined") {
-      index = 0;
+    if (!blockId) {
+      console.warn("No block ID provided for acceptRejectVerticalDiffBlock");
+      return;
     }
 
     const blocks = this.fileUriToCodeLens.get(fileUri);
@@ -211,13 +199,14 @@ export class VerticalDiffManager {
       return;
     }
 
-    // Validate index
-    if (index < 0 || index >= blocks.length) {
-      console.warn(`Invalid block index ${index}, available blocks: ${blocks.length}`);
+    // Find the block by UUID instead of index
+    const blockIndex = blocks.findIndex(block => block.id === blockId);
+    if (blockIndex === -1) {
+      console.warn(`Block with ID ${blockId} not found`);
       return;
     }
 
-    const block = blocks[index];
+    const block = blocks[blockIndex];
     const handler = this.getHandlerForFile(fileUri);
     if (!handler) {
       return;
@@ -239,9 +228,8 @@ export class VerticalDiffManager {
       // Calculate the line offset caused by this operation
       const lineOffset = accept ? -block.numRed : -block.numGreen;
 
-      // Remove the processed block from our array
-      const updatedBlocks = [...blocks];
-      updatedBlocks.splice(index, 1);
+      // Remove the processed block from our array by UUID
+      const updatedBlocks = blocks.filter(b => b.id !== blockId);
 
       // Update the positions of remaining blocks that come after the processed block
       for (let i = 0; i < updatedBlocks.length; i++) {
@@ -253,13 +241,15 @@ export class VerticalDiffManager {
         }
       }
 
-      // Update the blocks array
-      this.fileUriToCodeLens.set(fileUri, updatedBlocks);
-
-      // Check if this was the last block
+      // IMMEDIATELY update the blocks array to ensure CodeLens provider sees the change
       if (updatedBlocks.length === 0) {
+        // All blocks processed - clear everything immediately
+        this.fileUriToCodeLens.delete(fileUri);
+        this.fileUriToOriginalCursorPosition.delete(fileUri);
         this.clearForfileUri(fileUri, true);
       } else {
+        // Update with remaining blocks
+        this.fileUriToCodeLens.set(fileUri, updatedBlocks);
         // Re-enable listener for user changes to file
         this.enableDocumentChangeListener();
 
@@ -269,16 +259,15 @@ export class VerticalDiffManager {
           updatedBlocks.length,
           vscode.window.activeTextEditor?.document.getText(),
         );
-
-        // Force refresh CodeLenses to ensure they have correct indices
-        this.forceRefreshCodeLenses();
       }
 
-      // Additional safeguard: Always force refresh after any block operation
-      // This ensures CodeLenses are updated even if there were timing issues
+      // Force immediate refresh - this must happen AFTER state is updated
+      this.forceRefreshCodeLenses();
+
+      // Force another refresh with a tiny delay to ensure VS Code picks up the changes
       setTimeout(() => {
         this.forceRefreshCodeLenses();
-      }, 200);
+      }, 10);
     } catch (error) {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);
       // Re-enable listener even if there was an error
