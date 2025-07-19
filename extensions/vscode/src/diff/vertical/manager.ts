@@ -25,6 +25,47 @@ export interface VerticalDiffCodeLens {
 export class VerticalDiffManager {
   public refreshCodeLens: () => void = () => { };
 
+  private forceRefreshCodeLenses() {
+    // Immediate refresh
+    this.refreshCodeLens();
+
+    // Force VS Code to refresh CodeLenses by triggering the provider refresh event
+    // This is more reliable than just calling refreshCodeLens()
+    Promise.resolve(vscode.commands.executeCommand('editor.action.refresh')).catch(() => {
+      // Command might not exist, ignore the error
+    });
+
+    // Also trigger a CodeLens refresh command if available
+    Promise.resolve(vscode.commands.executeCommand('codelens.refresh')).catch(() => {
+      // Command might not exist, ignore the error
+    });
+
+    // Use process.nextTick if available (Node.js environment) for immediate execution
+    if (typeof process !== 'undefined' && process.nextTick) {
+      process.nextTick(() => {
+        this.refreshCodeLens();
+      });
+    }
+
+    // Use setImmediate if available (Node.js environment)
+    if (typeof setImmediate !== 'undefined') {
+      setImmediate(() => {
+        this.refreshCodeLens();
+      });
+    }
+
+    // Final fallback with timeout
+    setTimeout(() => {
+      this.refreshCodeLens();
+      // Double-check that the blocks were actually removed
+      const allBlocks = Array.from(this.fileUriToCodeLens.values()).flat();
+      if (allBlocks.length === 0) {
+        // If no blocks remain, ensure CodeLenses are cleared
+        Promise.resolve(vscode.commands.executeCommand('editor.action.refresh')).catch(() => { });
+      }
+    }, 100);
+  }
+
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
   fileUriToCodeLens: Map<string, VerticalDiffCodeLens[]> = new Map();
   public fileUriToOriginalCursorPosition: Map<string, vscode.Position> = new Map();
@@ -166,11 +207,17 @@ export class VerticalDiffManager {
     }
 
     const blocks = this.fileUriToCodeLens.get(fileUri);
-    const block = blocks?.[index];
-    if (!blocks || !block) {
+    if (!blocks || blocks.length === 0) {
       return;
     }
 
+    // Validate index
+    if (index < 0 || index >= blocks.length) {
+      console.warn(`Invalid block index ${index}, available blocks: ${blocks.length}`);
+      return;
+    }
+
+    const block = blocks[index];
     const handler = this.getHandlerForFile(fileUri);
     if (!handler) {
       return;
@@ -179,24 +226,64 @@ export class VerticalDiffManager {
     // Disable listening to file changes while continue makes changes
     this.disableDocumentChangeListener();
 
-    // Accept/reject the block
-    await handler.acceptRejectBlock(
-      accept,
-      block.start,
-      block.numGreen,
-      block.numRed,
-    );
+    try {
+      // Accept/reject the block - skip the handler's automatic block management
+      await handler.acceptRejectBlock(
+        accept,
+        block.start,
+        block.numGreen,
+        block.numRed,
+        true, // Skip status update, we'll handle it ourselves
+      );
 
-    // The handler's acceptRejectBlock calls shiftCodeLensObjects which updates
-    // the blocks array. Check if we have any blocks left.
-    const remainingBlocks = this.fileUriToCodeLens.get(fileUri);
+      // Calculate the line offset caused by this operation
+      const lineOffset = accept ? -block.numRed : -block.numGreen;
 
-    if (!remainingBlocks || remainingBlocks.length === 0) {
-      this.clearForfileUri(fileUri, true);
-    } else {
-      // Re-enable listener for user changes to file
+      // Remove the processed block from our array
+      const updatedBlocks = [...blocks];
+      updatedBlocks.splice(index, 1);
+
+      // Update the positions of remaining blocks that come after the processed block
+      for (let i = 0; i < updatedBlocks.length; i++) {
+        if (updatedBlocks[i].start > block.start) {
+          updatedBlocks[i] = {
+            ...updatedBlocks[i],
+            start: updatedBlocks[i].start + lineOffset,
+          };
+        }
+      }
+
+      // Update the blocks array
+      this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+
+      // Check if this was the last block
+      if (updatedBlocks.length === 0) {
+        this.clearForfileUri(fileUri, true);
+      } else {
+        // Re-enable listener for user changes to file
+        this.enableDocumentChangeListener();
+
+        // Update status
+        handler.options.onStatusUpdate?.(
+          undefined,
+          updatedBlocks.length,
+          vscode.window.activeTextEditor?.document.getText(),
+        );
+
+        // Force refresh CodeLenses to ensure they have correct indices
+        this.forceRefreshCodeLenses();
+      }
+
+      // Additional safeguard: Always force refresh after any block operation
+      // This ensures CodeLenses are updated even if there were timing issues
+      setTimeout(() => {
+        this.forceRefreshCodeLenses();
+      }, 200);
+    } catch (error) {
+      console.error("Error in acceptRejectVerticalDiffBlock:", error);
+      // Re-enable listener even if there was an error
       this.enableDocumentChangeListener();
-      // The handler already called refreshCodeLens via shiftCodeLensObjects
+      // Refresh to ensure consistent state
       this.refreshCodeLens();
     }
   }
