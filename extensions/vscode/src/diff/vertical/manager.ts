@@ -185,19 +185,18 @@ export class VerticalDiffManager {
       block.start,
       block.numGreen,
       block.numRed,
-      true, // Skip status update, we'll handle it here
     );
 
-    // Remove the processed block from our array manually to avoid index issues
-    blocks.splice(index, 1);
-    this.fileUriToCodeLens.set(fileUri, blocks);
+    // The handler's acceptRejectBlock calls shiftCodeLensObjects which updates
+    // the blocks array. Check if we have any blocks left.
+    const remainingBlocks = this.fileUriToCodeLens.get(fileUri);
 
-    if (blocks.length === 0) {
+    if (!remainingBlocks || remainingBlocks.length === 0) {
       this.clearForfileUri(fileUri, true);
     } else {
       // Re-enable listener for user changes to file
       this.enableDocumentChangeListener();
-      // Force refresh CodeLenses with correct indices
+      // The handler already called refreshCodeLens via shiftCodeLensObjects
       this.refreshCodeLens();
     }
   }
