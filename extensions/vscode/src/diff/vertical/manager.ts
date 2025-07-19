@@ -234,14 +234,13 @@ export class VerticalDiffManager {
         }
       }
 
-      // IMMEDIATELY update the blocks array to ensure CodeLens provider sees the change
+      // Check if all blocks are processed
       if (updatedBlocks.length === 0) {
-        // All blocks processed - clear everything immediately
-        this.fileUriToCodeLens.delete(fileUri);
-        this.fileUriToOriginalCursorPosition.delete(fileUri);
-        this.clearForfileUri(fileUri, true);
+        // All blocks processed - use the SAME reliable clearing mechanism as Accept All/Reject All
+        // This is the key fix - use the proven clearForfileUri method with correct accept parameter
+        this.clearForfileUri(fileUri, accept);
       } else {
-        // Update with remaining blocks
+        // Still have blocks remaining - update state and continue
         this.fileUriToCodeLens.set(fileUri, updatedBlocks);
         // Re-enable listener for user changes to file
         this.enableDocumentChangeListener();
@@ -252,10 +251,9 @@ export class VerticalDiffManager {
           updatedBlocks.length,
           vscode.window.activeTextEditor?.document.getText(),
         );
+        // Force refresh to update remaining CodeLenses
+        this.forceRefreshCodeLenses();
       }
-
-      // IMMEDIATE REFRESH: Force CodeLens to update instantly
-      this.forceRefreshCodeLenses();
     } catch (error) {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);
       // Re-enable listener even if there was an error
