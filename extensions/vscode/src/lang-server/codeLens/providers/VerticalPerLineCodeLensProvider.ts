@@ -15,6 +15,7 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
       string,
       VerticalDiffCodeLens[]
     >,
+    private readonly fileUriToOriginalCursorPosition: Map<string, vscode.Position>,
   ) { }
 
   private getCursorPosition(document: vscode.TextDocument): vscode.Position | null {
@@ -41,10 +42,10 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
       return codeLenses;
     }
 
-    // Add CodeLenses at cursor position only when there are active diffs
-    const cursorPosition = this.getCursorPosition(document);
-    if (cursorPosition) {
-      const cursorRange = new vscode.Range(cursorPosition, cursorPosition);
+    // Add CodeLenses at original cursor position only when there are active diffs
+    const originalCursorPosition = this.fileUriToOriginalCursorPosition.get(uri);
+    if (originalCursorPosition) {
+      const cursorRange = new vscode.Range(originalCursorPosition, originalCursorPosition);
 
       codeLenses.push(
         new vscode.CodeLens(cursorRange, {

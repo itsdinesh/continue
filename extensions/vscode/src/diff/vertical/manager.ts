@@ -27,6 +27,7 @@ export class VerticalDiffManager {
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
   fileUriToCodeLens: Map<string, VerticalDiffCodeLens[]> = new Map();
+  public fileUriToOriginalCursorPosition: Map<string, vscode.Position> = new Map();
 
   private userChangeListener: vscode.Disposable | undefined;
 
@@ -138,6 +139,9 @@ export class VerticalDiffManager {
       handler.clear(accept);
       this.fileUriToHandler.delete(fileUri);
     }
+
+    // Clear the stored original cursor position
+    this.fileUriToOriginalCursorPosition.delete(fileUri);
 
     this.disableDocumentChangeListener();
 
@@ -315,6 +319,9 @@ export class VerticalDiffManager {
     }
 
     const fileUri = editor.document.uri.toString();
+
+    // Store the original cursor position before the diff starts
+    this.fileUriToOriginalCursorPosition.set(fileUri, editor.selection.active);
 
     let startLine, endLine: number;
 

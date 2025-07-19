@@ -156,6 +156,7 @@ export class VsCodeExtension {
         context,
         this.verticalDiffManager.fileUriToCodeLens,
         config,
+        this.verticalDiffManager.fileUriToOriginalCursorPosition,
       );
 
       this.verticalDiffManager.refreshCodeLens =
@@ -186,6 +187,7 @@ export class VsCodeExtension {
             context,
             this.verticalDiffManager.fileUriToCodeLens,
             newConfig,
+            this.verticalDiffManager.fileUriToOriginalCursorPosition,
           );
         }
       },
@@ -396,8 +398,7 @@ export class VsCodeExtension {
 
     // Register a content provider for the readonly virtual documents
     const documentContentProvider = new (class
-      implements vscode.TextDocumentContentProvider
-    {
+      implements vscode.TextDocumentContentProvider {
       // emitter and its event
       onDidChangeEmitter = new vscode.EventEmitter<vscode.Uri>();
       onDidChange = this.onDidChangeEmitter.event;
