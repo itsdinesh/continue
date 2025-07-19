@@ -320,8 +320,8 @@ export class VerticalDiffManager {
 
     const fileUri = editor.document.uri.toString();
 
-    // Store the original cursor position before the diff starts
-    this.fileUriToOriginalCursorPosition.set(fileUri, editor.selection.active);
+    // Store the original cursor position (start of selection) before the diff starts
+    this.fileUriToOriginalCursorPosition.set(fileUri, editor.selection.start);
 
     let startLine, endLine: number;
 
