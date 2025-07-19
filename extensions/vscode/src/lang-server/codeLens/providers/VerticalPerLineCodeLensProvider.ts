@@ -36,7 +36,12 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
     const blocks = this.editorToVerticalDiffCodeLens.get(uri);
     const codeLenses: vscode.CodeLens[] = [];
 
-    // Add CodeLenses at cursor position
+    // Only show CodeLenses if there are active diff blocks
+    if (!blocks || blocks.length === 0) {
+      return codeLenses;
+    }
+
+    // Add CodeLenses at cursor position only when there are active diffs
     const cursorPosition = this.getCursorPosition(document);
     if (cursorPosition) {
       const cursorRange = new vscode.Range(cursorPosition, cursorPosition);
@@ -65,11 +70,6 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
           arguments: [uri, 0], // Using 0 as default block index for cursor position
         }),
       );
-    }
-
-    // Add existing diff-related CodeLenses
-    if (!blocks) {
-      return codeLenses;
     }
 
     for (let i = 0; i < blocks.length; i++) {
