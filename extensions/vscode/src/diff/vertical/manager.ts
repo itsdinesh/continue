@@ -36,11 +36,36 @@ export class VerticalDiffManager {
   }
 
   private forceRefreshCodeLenses() {
-    // Immediate synchronous refresh - this should directly call the CodeLens provider's refresh
-    this.refreshCodeLens();
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      // Method 1: Direct CodeLens provider execution (this works)
+      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
 
-    // Force immediate execution without any delays
-    this.refreshCodeLens();
+      // Method 2: Force immediate refresh using multiple synchronous calls
+      this.refreshCodeLens();
+      this.refreshCodeLens();
+      this.refreshCodeLens();
+
+      // Method 3: Force a minimal document change to trigger VS Code's refresh
+      const currentPosition = editor.selection.active;
+      const currentSelection = editor.selection;
+
+      // Use a more direct approach - insert and immediately delete
+      const edit = new vscode.WorkspaceEdit();
+      edit.insert(editor.document.uri, currentPosition, ' ');
+      edit.delete(editor.document.uri, new vscode.Range(currentPosition, currentPosition.translate(0, 1)));
+
+      vscode.workspace.applyEdit(edit).then(() => {
+        // Restore original selection
+        if (editor === vscode.window.activeTextEditor) {
+          editor.selection = currentSelection;
+        }
+        // Force another refresh after the edit
+        this.refreshCodeLens();
+      });
+    }
+
+    // Trigger our own refresh mechanism
     this.refreshCodeLens();
   }
 
