@@ -208,21 +208,21 @@ export class VerticalDiffManager {
       return;
     }
 
-    // CRITICAL: Update state FIRST, before any async operations
-    // This prevents the UI from ever seeing the stale state
+    // CRITICAL FIX: Update state IMMEDIATELY and SYNCHRONOUSLY before any async operations
+    // This prevents the CodeLens provider from ever seeing the old state
     const updatedBlocks = blocks.filter(b => b.id !== blockId);
 
-    // Immediately update the state so CodeLens provider never sees the old state
+    // Update state immediately - this is the key to making accept work like reject
+    this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+
+    // If no blocks left, clear everything immediately
     if (updatedBlocks.length === 0) {
-      // All blocks will be processed - clear everything immediately
       this.fileUriToCodeLens.delete(fileUri);
       this.fileUriToOriginalCursorPosition.delete(fileUri);
-    } else {
-      this.fileUriToCodeLens.set(fileUri, updatedBlocks);
     }
 
-    // Force immediate synchronous refresh before any async operations
-    this.refreshCodeLens();
+    // Force immediate refresh with the updated state
+    this.forceRefreshCodeLenses();
 
     // Disable listening to file changes while continue makes changes
     this.disableDocumentChangeListener();
@@ -237,7 +237,7 @@ export class VerticalDiffManager {
         true, // Skip status update, we'll handle it ourselves
       );
 
-      // Calculate the line offset and update remaining block positions
+      // Calculate line offset and update remaining block positions
       if (updatedBlocks.length > 0) {
         const lineOffset = accept ? -block.numRed : -block.numGreen;
 
