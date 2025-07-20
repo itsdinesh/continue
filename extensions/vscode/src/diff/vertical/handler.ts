@@ -50,6 +50,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
     ) => void,
     private readonly refreshCodeLens: () => void,
     public options: VerticalDiffHandlerOptions,
+    private readonly generateBlockId: () => string,
   ) {
     this.currentLineIndex = startLine;
     this.streamId = options.streamId;
@@ -176,11 +177,11 @@ export class VerticalDiffHandler implements vscode.Disposable {
 
       const myersDiffs = await this.reapplyWithMyersDiff(diffLines);
 
-      // Scroll to the first diff
-      const scrollToLine =
-        this.getFirstChangedLine(myersDiffs) ?? this.startLine;
-      const range = new vscode.Range(scrollToLine, 0, scrollToLine, 0);
-      this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
+      // Disabled auto-scrolling to first diff to keep cursor position stable during inline edit
+      // const scrollToLine =
+      //   this.getFirstChangedLine(myersDiffs) ?? this.startLine;
+      // const range = new vscode.Range(scrollToLine, 0, scrollToLine, 0);
+      // this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
 
       this.options.onStatusUpdate(
         "done",
@@ -354,6 +355,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
         numGreen++;
       } else if (diff.type === "same" && (numRed > 0 || numGreen > 0)) {
         codeLensBlocks.push({
+          id: this.generateBlockId(),
           numRed,
           numGreen,
           start: this.startLine + index - numRed - numGreen,
@@ -365,6 +367,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
 
     if (numRed > 0 || numGreen > 0) {
       codeLensBlocks.push({
+        id: this.generateBlockId(),
         numGreen,
         numRed,
         start: this.startLine + myersDiffs.length - numRed - numGreen,
@@ -382,6 +385,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
       const blocks = this.editorToVerticalDiffCodeLens.get(this.fileUri) || [];
 
       blocks.push({
+        id: this.generateBlockId(),
         start: this.currentLineIndex - this.insertedInCurrentBlock,
         numRed: this.deletionBuffer.length,
         numGreen: this.insertedInCurrentBlock,
@@ -425,13 +429,14 @@ export class VerticalDiffHandler implements vscode.Disposable {
   private incrementCurrentLineIndex() {
     this.currentLineIndex++;
     this.updateIndexLineDecorations();
-    const range = new vscode.Range(
-      this.currentLineIndex,
-      0,
-      this.currentLineIndex,
-      0,
-    );
-    this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
+    // Disabled auto-scrolling during inline edit to keep cursor position stable
+    // const range = new vscode.Range(
+    //   this.currentLineIndex,
+    //   0,
+    //   this.currentLineIndex,
+    //   0,
+    // );
+    // this.editor.revealRange(range, vscode.TextEditorRevealType.Default);
   }
 
   private async insertTextAboveLine(index: number, text: string) {

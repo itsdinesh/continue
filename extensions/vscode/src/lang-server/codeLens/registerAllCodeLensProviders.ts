@@ -79,6 +79,7 @@ export function registerAllCodeLensProviders(
   context: vscode.ExtensionContext,
   editorToVerticalDiffCodeLens: Map<string, VerticalDiffCodeLens[]>,
   config: ContinueConfig | undefined,
+  fileUriToOriginalCursorPosition?: Map<string, vscode.Position>,
 ) {
   if (verticalPerLineCodeLensProvider) {
     verticalPerLineCodeLensProvider.dispose();
@@ -110,6 +111,7 @@ export function registerAllCodeLensProviders(
 
   const verticalDiffCodeLens = new providers.VerticalPerLineCodeLensProvider(
     editorToVerticalDiffCodeLens,
+    fileUriToOriginalCursorPosition || new Map(),
   );
 
   verticalPerLineCodeLensProvider = registerCodeLensProvider(

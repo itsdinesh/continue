@@ -1,19 +1,19 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { IDE, ILLM, RuleWithSource } from "core";
 import { ConfigHandler } from "core/config/ConfigHandler";
+import { getModelByRole } from "core/config/util";
+import { Core } from "core/core";
 import { DataLogger } from "core/data/log";
+import { walkDir } from "core/indexing/walkDir";
 import { Telemetry } from "core/util/posthog";
+import MiniSearch from "minisearch";
 import * as vscode from "vscode";
-
 import { VerticalDiffManager } from "../diff/vertical/manager";
 import { FileSearch } from "../util/FileSearch";
 import { VsCodeWebviewProtocol } from "../webviewProtocol";
-
 import { getContextProviderQuickPickVal } from "./ContextProvidersQuickPick";
 import { appendToHistory, getHistoryQuickPickVal } from "./HistoryQuickPick";
-
-// @ts-ignore - error finding typings
-// @ts-ignore
+import { getModelQuickPickVal } from "./ModelSelectionQuickPick";
 
 /**
  * Used to track what action to take after a user interacts
@@ -22,6 +22,7 @@ import { appendToHistory, getHistoryQuickPickVal } from "./HistoryQuickPick";
 enum QuickEditInitialItemLabels {
   History = "History",
   ContextProviders = "Context providers",
+  Model = "Model",
   Submit = "Submit",
 }
 
@@ -39,6 +40,8 @@ export type QuickEditShowParams = {
    */
   range?: vscode.Range;
 };
+
+type FileMiniSearchResult = { filename: string };
 
 const FILE_SEARCH_CHAR = "@";
 
@@ -84,6 +87,15 @@ export class QuickEdit {
   private range?: vscode.Range;
   private initialPrompt?: string;
 
+  private miniSearch = new MiniSearch<FileMiniSearchResult>({
+    fields: ["filename"],
+    storeFields: ["filename"],
+    searchOptions: {
+      prefix: true,
+      fuzzy: 2,
+    },
+  });
+
   private previousInput?: string;
 
   /**
@@ -98,6 +110,16 @@ export class QuickEdit {
    */
   private contextProviderStr?: string;
 
+  /**
+   * Stores the current model for potential changes
+   */
+  private _curModel?: ILLM;
+
+  /**
+   * Stores the current quick pick instance for real-time updates
+   */
+  private _currentQuickPick?: vscode.QuickPick<vscode.QuickPickItem>;
+
   constructor(
     private readonly verticalDiffManager: VerticalDiffManager,
     private readonly configHandler: ConfigHandler,
@@ -105,7 +127,10 @@ export class QuickEdit {
     private readonly ide: IDE,
     private readonly context: vscode.ExtensionContext,
     private readonly fileSearch: FileSearch,
-  ) {}
+    private readonly core: Core,
+  ) {
+    this.initializeFileSearchState();
+  }
 
   /**
    * Shows the Quick Edit Quick Pick, allowing the user to select an initial item or enter a prompt.
@@ -246,9 +271,34 @@ export class QuickEdit {
     const { config } = await this.configHandler.loadConfig();
     const rules = config?.rules ?? []; // no need to error - getCurModel above will handle
 
-    await this._streamEditWithInputAndContext(prompt, model, rules);
-    this.openAcceptRejectMenu(prompt, path);
+    const statusBarMessage = vscode.window.setStatusBarMessage("Editing in progress...");
+    try {
+      await this._streamEditWithInputAndContext(prompt, model, rules);
+      statusBarMessage.dispose();
+      vscode.window.setStatusBarMessage("Edit completed successfully", 5000);
+    } catch (error) {
+      statusBarMessage.dispose();
+      vscode.window.setStatusBarMessage("Edit failed", 5000);
+      throw error;
+    }
   };
+
+  private async initializeFileSearchState() {
+    const workspaceDirs = await this.ide.getWorkspaceDirs();
+
+    const results = await Promise.all(
+      workspaceDirs.map((dir) => {
+        return walkDir(dir, this.ide);
+      }),
+    );
+
+    const filenames = results.flat().map((file) => ({
+      id: file,
+      filename: vscode.workspace.asRelativePath(file),
+    }));
+
+    this.miniSearch.addAll(filenames);
+  }
 
   private setActiveEditorAndPrevInput(editor: vscode.TextEditor) {
     const existingHandler = this.verticalDiffManager.getHandlerForFile(
@@ -260,7 +310,7 @@ export class QuickEdit {
   }
 
   /**
-   * Gets the model title the user has chosen, or their default model
+   * Gets the model the user has chosen, or their default model
    */
   private async getCurModel(): Promise<ILLM | null> {
     const { config } = await this.configHandler.loadConfig();
@@ -268,7 +318,39 @@ export class QuickEdit {
       return null;
     }
 
+    if (this._curModel) {
+      return this._curModel;
+    }
+
     return config.selectedModelByRole.edit ?? config.selectedModelByRole.chat;
+  }
+
+  /**
+   * Gets the model title the user has chosen, or their default model
+   */
+  private async getCurModelTitle() {
+    const { config } = await this.configHandler.loadConfig();
+    if (!config) {
+      return null;
+    }
+
+    // Always prioritize the global edit model selected in the sidebar
+    // This ensures sidebar changes are immediately reflected
+    const globalEditModel = config.selectedModelByRole.edit?.title;
+
+    // If we have a local model selection and it differs from the global one,
+    // clear the local selection to sync with sidebar
+    if (this._curModel && this._curModel.title !== globalEditModel) {
+      this._curModel = undefined;
+    }
+
+    // Return the global edit model or fallback chain
+    return (
+      globalEditModel ??
+      config.selectedModelByRole.chat?.title ??
+      getModelByRole(config, "inlineEdit")?.title ??
+      config.models?.[0]?.title
+    );
   }
 
   /**
@@ -335,7 +417,7 @@ export class QuickEdit {
     });
   }
 
-  private getInitialItems(): vscode.QuickPickItem[] {
+  private getInitialItems(modelTitle: string | null | undefined): vscode.QuickPickItem[] {
     return [
       {
         label: QuickEditInitialItemLabels.History,
@@ -345,6 +427,10 @@ export class QuickEdit {
         label: QuickEditInitialItemLabels.ContextProviders,
         detail: "$(add) Add context to your prompt",
       },
+      {
+        label: QuickEditInitialItemLabels.Model,
+        detail: `$(chevron-down) ${modelTitle || "No model selected"}`,
+      },
     ];
   }
 
@@ -352,16 +438,12 @@ export class QuickEdit {
     label: QuickEditInitialItemLabels | undefined;
     value: string | undefined;
   }> {
-    const modelTitle = await this.getCurModel();
-
-    if (!modelTitle) {
-      this.ide.showToast("error", "Please configure a model to use Quick Edit");
-      return { label: undefined, value: undefined };
-    }
+    const modelTitle = await this.getCurModelTitle();
 
     const quickPick = vscode.window.createQuickPick();
+    this._currentQuickPick = quickPick; // Store reference for real-time updates
 
-    const initialItems = this.getInitialItems();
+    const initialItems = this.getInitialItems(modelTitle);
     quickPick.items = initialItems;
     quickPick.placeholder =
       "Enter a prompt to edit your code (@ to search files, ⏎ to submit)";
@@ -369,11 +451,19 @@ export class QuickEdit {
     quickPick.ignoreFocusOut = true;
     quickPick.value = this.initialPrompt ?? "";
 
+    // Set up real-time config monitoring
+    this.setupConfigMonitoring();
     quickPick.show();
 
     quickPick.onDidChangeValue((value) =>
       this.handleQuickPickChange({ value, quickPick, initialItems }),
     );
+
+    // Clean up when quick pick is disposed
+    quickPick.onDidHide(() => {
+      this._currentQuickPick = undefined;
+    });
+
     /**
      * Waits for the user to select an item from the quick pick.
      *
@@ -434,12 +524,14 @@ export class QuickEdit {
           // search character to the end of the string
           const searchQuery = value.substring(lastAtIndex + 1);
 
-          const searchResults = this.fileSearch.search(searchQuery);
+          const searchResults = this.miniSearch.search(
+            searchQuery,
+          ) as unknown as FileMiniSearchResult[];
 
           if (searchResults.length > 0) {
             quickPick.items = searchResults
-              .map(({ relativePath }) => ({
-                label: relativePath,
+              .map(({ filename }) => ({
+                label: filename,
                 alwaysShow: true,
               }))
               .slice(0, QuickEdit.maxFileSearchResults);
@@ -532,6 +624,56 @@ export class QuickEdit {
 
         break;
 
+      case QuickEditInitialItemLabels.Model: {
+        // Reload config to get latest models
+        const { config: freshConfig } = await this.configHandler.loadConfig();
+        if (!freshConfig) {
+          this.ide.showToast("error", "Failed to load configuration");
+          break;
+        }
+
+        const curModelTitle = await this.getCurModelTitle();
+
+        const selectedModelTitle = await getModelQuickPickVal(
+          curModelTitle || "No model selected",
+          freshConfig,
+        );
+
+        if (selectedModelTitle) {
+          // Find the selected model from the edit models list
+          const selectedModel = freshConfig.modelsByRole?.edit?.find(
+            (m) => m.title === selectedModelTitle,
+          );
+
+          if (selectedModel) {
+            // Store locally for this Quick Edit session
+            this._curModel = selectedModel;
+
+            // Update the global config to sync with sidebar - same as sidebar does
+            if (this.configHandler.currentProfile?.profileDescription.id) {
+              await this.core.invoke("config/updateSelectedModel", {
+                profileId: this.configHandler.currentProfile.profileDescription.id,
+                role: "edit",
+                title: selectedModel.title || null,
+              });
+            }
+
+            this.ide.showToast(
+              "info",
+              `Switched to model: ${selectedModelTitle}`,
+            );
+          } else {
+            this.ide.showToast(
+              "error",
+              `Could not find model: ${selectedModelTitle}`,
+            );
+          }
+        }
+
+        this.initiateNewQuickPick(editor, params);
+        break;
+      }
+
       case QuickEditInitialItemLabels.Submit:
         if (selectedValue) {
           prompt = selectedValue;
@@ -540,6 +682,58 @@ export class QuickEdit {
     }
 
     return prompt;
+  }
+
+  /**
+   * Sets up real-time monitoring of config changes to update the Quick Pick UI
+   */
+  private setupConfigMonitoring() {
+    if (!this._currentQuickPick) return;
+
+    // Monitor config changes and update the UI in real-time
+    const configWatcher = setInterval(async () => {
+      if (!this._currentQuickPick) {
+        clearInterval(configWatcher);
+        return;
+      }
+
+      try {
+        const currentModelTitle = await this.getCurModelTitle();
+        const currentItems = this._currentQuickPick.items;
+
+        // Find the Model item in the current items
+        const modelItemIndex = currentItems.findIndex(
+          (item) => item.label === QuickEditInitialItemLabels.Model,
+        );
+
+        if (modelItemIndex !== -1) {
+          const currentModelItem = currentItems[modelItemIndex];
+          const expectedDetail = `$(chevron-down) ${
+            currentModelTitle || "No model selected"
+          }`;
+
+          // Only update if the model title has changed
+          if (currentModelItem.detail !== expectedDetail) {
+            const updatedItems = [...currentItems];
+            updatedItems[modelItemIndex] = {
+              ...currentModelItem,
+              detail: expectedDetail,
+            };
+
+            // Update the Quick Pick items to reflect the new model
+            this._currentQuickPick.items = updatedItems;
+          }
+        }
+      } catch (error) {
+        // Silently handle errors to avoid disrupting the user experience
+        console.warn("Error updating Quick Pick model title:", error);
+      }
+    }, 500); // Check every 500ms for config changes
+
+    // Clean up the watcher when Quick Pick is disposed
+    this._currentQuickPick.onDidHide(() => {
+      clearInterval(configWatcher);
+    });
   }
 
   /**
