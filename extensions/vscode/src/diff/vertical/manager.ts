@@ -26,37 +26,21 @@ export interface VerticalDiffCodeLens {
 export class VerticalDiffManager {
   public refreshCodeLens: () => void = () => { };
 
+  // Event emitter for immediate CodeLens updates
+  private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
+  public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
+
   // Generate a simple UUID for diff blocks
   private generateBlockId(): string {
     return 'block-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now().toString(36);
   }
 
   private forceRefreshCodeLenses() {
-    // Use multiple aggressive refresh mechanisms to force immediate UI update
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      // Method 1: Direct CodeLens provider execution
-      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
+    // Immediate synchronous refresh - this should directly call the CodeLens provider's refresh
+    this.refreshCodeLens();
 
-      // Method 2: Force editor to completely refresh by simulating minimize/maximize effect
-      // This mimics what happens when you minimize/maximize VS Code
-      vscode.commands.executeCommand('workbench.action.toggleEditorVisibility').then(() => {
-        setTimeout(() => {
-          vscode.commands.executeCommand('workbench.action.toggleEditorVisibility');
-        }, 1);
-      });
-
-      // Method 3: Force a fake document change to trigger complete refresh
-      const currentPosition = editor.selection.active;
-      const edit = new vscode.WorkspaceEdit();
-      edit.insert(editor.document.uri, currentPosition, '');
-      vscode.workspace.applyEdit(edit).then(() => {
-        // Immediately undo the fake change
-        vscode.commands.executeCommand('undo');
-      });
-    }
-
-    // Also trigger our own refresh mechanism
+    // Force immediate execution without any delays
+    this.refreshCodeLens();
     this.refreshCodeLens();
   }
 
@@ -224,11 +208,27 @@ export class VerticalDiffManager {
       return;
     }
 
+    // CRITICAL: Update state FIRST, before any async operations
+    // This prevents the UI from ever seeing the stale state
+    const updatedBlocks = blocks.filter(b => b.id !== blockId);
+
+    // Immediately update the state so CodeLens provider never sees the old state
+    if (updatedBlocks.length === 0) {
+      // All blocks will be processed - clear everything immediately
+      this.fileUriToCodeLens.delete(fileUri);
+      this.fileUriToOriginalCursorPosition.delete(fileUri);
+    } else {
+      this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+    }
+
+    // Force immediate synchronous refresh before any async operations
+    this.refreshCodeLens();
+
     // Disable listening to file changes while continue makes changes
     this.disableDocumentChangeListener();
 
     try {
-      // Accept/reject the block - skip the handler's automatic block management
+      // Now perform the actual accept/reject operation
       await handler.acceptRejectBlock(
         accept,
         block.start,
@@ -237,36 +237,23 @@ export class VerticalDiffManager {
         true, // Skip status update, we'll handle it ourselves
       );
 
-      // Calculate the line offset caused by this operation
-      const lineOffset = accept ? -block.numRed : -block.numGreen;
+      // Calculate the line offset and update remaining block positions
+      if (updatedBlocks.length > 0) {
+        const lineOffset = accept ? -block.numRed : -block.numGreen;
 
-      // Remove the processed block from our array by UUID
-      const updatedBlocks = blocks.filter(b => b.id !== blockId);
-
-      // IMMEDIATELY update the state so CodeLens provider sees the change
-      this.fileUriToCodeLens.set(fileUri, updatedBlocks);
-
-      // Force immediate refresh right after state update
-      this.forceRefreshCodeLenses();
-
-      // Update the positions of remaining blocks that come after the processed block
-      for (let i = 0; i < updatedBlocks.length; i++) {
-        if (updatedBlocks[i].start > block.start) {
-          updatedBlocks[i] = {
-            ...updatedBlocks[i],
-            start: updatedBlocks[i].start + lineOffset,
-          };
+        // Update the positions of remaining blocks that come after the processed block
+        for (let i = 0; i < updatedBlocks.length; i++) {
+          if (updatedBlocks[i].start > block.start) {
+            updatedBlocks[i] = {
+              ...updatedBlocks[i],
+              start: updatedBlocks[i].start + lineOffset,
+            };
+          }
         }
-      }
 
-      // Check if all blocks are processed
-      if (updatedBlocks.length === 0) {
-        // All blocks processed - use the SAME reliable clearing mechanism as Accept All/Reject All
-        // This is the key fix - use the proven clearForfileUri method with correct accept parameter
-        this.clearForfileUri(fileUri, accept);
-      } else {
-        // Still have blocks remaining - update state and continue
+        // Update with corrected positions
         this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+
         // Re-enable listener for user changes to file
         this.enableDocumentChangeListener();
 
@@ -276,8 +263,9 @@ export class VerticalDiffManager {
           updatedBlocks.length,
           vscode.window.activeTextEditor?.document.getText(),
         );
-        // Force refresh to update remaining CodeLenses
-        this.forceRefreshCodeLenses();
+      } else {
+        // All blocks processed - use the reliable clearing mechanism
+        this.clearForfileUri(fileUri, accept);
       }
     } catch (error) {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);
