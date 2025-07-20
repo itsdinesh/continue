@@ -36,10 +36,10 @@ export async function processDiff(
 
   // Clear vertical diffs depending on action
   verticalDiffManager.clearForfileUri(newOrCurrentUri, action === "accept");
-  if (action === "reject") {
-    // this is so that IDE reject diff command can also cancel apply
-    core.invoke("cancelApply", undefined);
-  }
+
+  // CRITICAL FIX: Both accept and reject need to clean up apply state
+  // This was the root cause - reject was cleaning up but accept wasn't!
+  core.invoke("cancelApply", undefined);
 
   if (streamId) {
     const fileContent = await ide.readFile(newOrCurrentUri);
