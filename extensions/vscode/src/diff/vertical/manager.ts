@@ -36,19 +36,8 @@ export class VerticalDiffManager {
   }
 
   private forceRefreshCodeLenses() {
-    // CRITICAL: Make this completely synchronous to avoid race conditions
-    // The issue is that async operations interfere when clicking accept buttons quickly
+    // Just call the refresh function - VS Code will update when it's ready
     this.refreshCodeLens();
-    this.refreshCodeLens();
-    this.refreshCodeLens();
-
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      // Direct CodeLens provider execution - this is synchronous and reliable
-      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
-      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
-      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
-    }
   }
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
@@ -228,8 +217,8 @@ export class VerticalDiffManager {
       this.fileUriToOriginalCursorPosition.delete(fileUri);
     }
 
-    // Force immediate and aggressive refresh with updated state
-    this.forceRefreshCodeLenses();
+    // Force CodeLens refresh - VS Code will update when it's ready
+    this.refreshCodeLens();
 
     // Disable listening to file changes while continue makes changes
     this.disableDocumentChangeListener();
@@ -271,15 +260,8 @@ export class VerticalDiffManager {
           vscode.window.activeTextEditor?.document.getText(),
         );
       } else {
-        // All blocks processed - send final status update before clearing
-        handler.options.onStatusUpdate?.(
-          "closed",
-          0,
-          vscode.window.activeTextEditor?.document.getText(),
-        );
-
-        // Then use the reliable clearing mechanism
-        this.clearForfileUri(fileUri, accept);
+        // All blocks processed - let the commands.ts processDiff handle the cleanup
+        // Don't call clearForfileUri here as it interferes with the processDiff flow
       }
     } catch (error) {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);

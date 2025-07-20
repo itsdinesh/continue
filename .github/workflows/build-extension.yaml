@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - quickpick-main
+      - quickpick-v1163
   workflow_dispatch:
 
 jobs:
