@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 
 import {
   AddedLineDecorationManager,
+  ProgressiveFadeManager,
   RemovedLineDecorationManager,
   belowIndexDecorationType,
   indexDecorationType,
@@ -33,6 +34,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
   private deletionBuffer: string[] = [];
   private removedLineDecorations: RemovedLineDecorationManager;
   private addedLineDecorations: AddedLineDecorationManager;
+  private progressiveFadeManager: ProgressiveFadeManager;
   private _diffLinesQueue: DiffLine[] = [];
   private _queueLock = false;
 
@@ -57,6 +59,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
 
     this.removedLineDecorations = new RemovedLineDecorationManager(this.editor);
     this.addedLineDecorations = new AddedLineDecorationManager(this.editor);
+    this.progressiveFadeManager = new ProgressiveFadeManager(this.editor);
 
     const disposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (!editor) {
@@ -67,6 +70,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
         this.editor = editor;
         this.removedLineDecorations.applyToNewEditor(editor);
         this.addedLineDecorations.applyToNewEditor(editor);
+        this.progressiveFadeManager.applyToNewEditor(editor);
         this.updateIndexLineDecorations();
         this.refreshCodeLens();
 
@@ -269,6 +273,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
     // Update decorations
     this.removedLineDecorations.shiftDownAfterLine(startLine, lineDelta);
     this.addedLineDecorations.shiftDownAfterLine(startLine, lineDelta);
+    this.progressiveFadeManager.shiftDownAfterLine(startLine, lineDelta);
 
     // Update code lens
     this.shiftCodeLensObjects(startLine, lineDelta);
@@ -282,6 +287,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
   clearDecorations() {
     this.removedLineDecorations.clear();
     this.addedLineDecorations.clear();
+    this.progressiveFadeManager.clear();
     this.clearIndexLineDecorations();
     this.editorToVerticalDiffCodeLens.delete(this.fileUri);
     this.refreshCodeLens();
@@ -427,6 +433,11 @@ export class VerticalDiffHandler implements vscode.Disposable {
   }
 
   private incrementCurrentLineIndex() {
+    // Add the previous line to progressive fade manager to show it's been processed
+    if (this.currentLineIndex > this.startLine) {
+      this.progressiveFadeManager.addProcessedLine(this.currentLineIndex - 1);
+    }
+
     this.currentLineIndex++;
     this.updateIndexLineDecorations();
     // Disabled auto-scrolling during inline edit to keep cursor position stable
@@ -496,7 +507,10 @@ export class VerticalDiffHandler implements vscode.Disposable {
 
   private updateIndexLineDecorations() {
     if (this.options.instant) {
-      // We don't show progress on instant apply
+      // For instant apply, show all processed lines with fade effect
+      for (let i = this.startLine; i < this.currentLineIndex; i++) {
+        this.progressiveFadeManager.addProcessedLine(i);
+      }
       return;
     }
 

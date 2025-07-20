@@ -64,7 +64,7 @@ export class ProgressiveFadeManager {
   private processedLines: Array<{ line: number; timestamp: number }> = [];
   private fadeIntervals: NodeJS.Timeout[] = [];
   private readonly maxFadeSteps = 5;
-  private readonly fadeStepDuration = 800; // ms between fade steps
+  private readonly fadeStepDuration = 500; // ms between fade steps (faster for better feedback)
 
   constructor(private editor: vscode.TextEditor) {}
 
