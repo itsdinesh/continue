@@ -36,37 +36,19 @@ export class VerticalDiffManager {
   }
 
   private forceRefreshCodeLenses() {
+    // CRITICAL: Make this completely synchronous to avoid race conditions
+    // The issue is that async operations interfere when clicking accept buttons quickly
+    this.refreshCodeLens();
+    this.refreshCodeLens();
+    this.refreshCodeLens();
+
     const editor = vscode.window.activeTextEditor;
     if (editor) {
-      // Method 1: Direct CodeLens provider execution (this works)
+      // Direct CodeLens provider execution - this is synchronous and reliable
       vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
-
-      // Method 2: Force immediate refresh using multiple synchronous calls
-      this.refreshCodeLens();
-      this.refreshCodeLens();
-      this.refreshCodeLens();
-
-      // Method 3: Force a minimal document change to trigger VS Code's refresh
-      const currentPosition = editor.selection.active;
-      const currentSelection = editor.selection;
-
-      // Use a more direct approach - insert and immediately delete
-      const edit = new vscode.WorkspaceEdit();
-      edit.insert(editor.document.uri, currentPosition, ' ');
-      edit.delete(editor.document.uri, new vscode.Range(currentPosition, currentPosition.translate(0, 1)));
-
-      vscode.workspace.applyEdit(edit).then(() => {
-        // Restore original selection
-        if (editor === vscode.window.activeTextEditor) {
-          editor.selection = currentSelection;
-        }
-        // Force another refresh after the edit
-        this.refreshCodeLens();
-      });
+      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
+      vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
     }
-
-    // Trigger our own refresh mechanism
-    this.refreshCodeLens();
   }
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
@@ -233,11 +215,11 @@ export class VerticalDiffManager {
       return;
     }
 
-    // CRITICAL FIX: Update state IMMEDIATELY and SYNCHRONOUSLY before any async operations
-    // This prevents the CodeLens provider from ever seeing the old state
+    // CRITICAL: Update state IMMEDIATELY and SYNCHRONOUSLY before any async operations
+    // This prevents race conditions and ensures consistent behavior like reject
     const updatedBlocks = blocks.filter(b => b.id !== blockId);
 
-    // Update state immediately - this is the key to making accept work like reject
+    // Update state immediately - this is the key to consistent behavior
     this.fileUriToCodeLens.set(fileUri, updatedBlocks);
 
     // If no blocks left, clear everything immediately
@@ -246,7 +228,7 @@ export class VerticalDiffManager {
       this.fileUriToOriginalCursorPosition.delete(fileUri);
     }
 
-    // Force immediate refresh with the updated state
+    // Force immediate and aggressive refresh with updated state
     this.forceRefreshCodeLenses();
 
     // Disable listening to file changes while continue makes changes
@@ -289,7 +271,14 @@ export class VerticalDiffManager {
           vscode.window.activeTextEditor?.document.getText(),
         );
       } else {
-        // All blocks processed - use the reliable clearing mechanism
+        // All blocks processed - send final status update before clearing
+        handler.options.onStatusUpdate?.(
+          "closed",
+          0,
+          vscode.window.activeTextEditor?.document.getText(),
+        );
+
+        // Then use the reliable clearing mechanism
         this.clearForfileUri(fileUri, accept);
       }
     } catch (error) {
