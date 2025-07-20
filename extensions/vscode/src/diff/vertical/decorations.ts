@@ -42,29 +42,16 @@ export const belowIndexDecorationType =
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
   });
 
-// Progressive fade decoration types for processed lines
-const createFadeDecorationType = (opacity: number) =>
-  vscode.window.createTextEditorDecorationType({
-    isWholeLine: true,
-    backgroundColor: `rgba(255, 255, 255, ${opacity})`,
-    rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-  });
+// Instant fade decoration for processed lines
+const processedLineDecorationType = vscode.window.createTextEditorDecorationType({
+  isWholeLine: true,
+  backgroundColor: "rgba(255, 255, 255, 0.08)", // Subtle fade to show processed lines
+  rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+});
 
-// Create multiple fade levels for smooth transition
-export const fadeDecorationTypes = [
-  createFadeDecorationType(0.15), // Most recent
-  createFadeDecorationType(0.12),
-  createFadeDecorationType(0.09),
-  createFadeDecorationType(0.06),
-  createFadeDecorationType(0.03), // Oldest, almost transparent
-];
-
-// Class for managing progressive fade decorations for processed lines
+// Class for managing instant fade decorations for processed lines
 export class ProgressiveFadeManager {
-  private processedLines: Array<{ line: number; timestamp: number }> = [];
-  private fadeIntervals: NodeJS.Timeout[] = [];
-  private readonly maxFadeSteps = 5;
-  private readonly fadeStepDuration = 500; // ms between fade steps (faster for better feedback)
+  private processedLines: Set<number> = new Set();
 
   constructor(private editor: vscode.TextEditor) {}
 
@@ -74,85 +61,30 @@ export class ProgressiveFadeManager {
   }
 
   addProcessedLine(lineNumber: number) {
-    const timestamp = Date.now();
-    this.processedLines.push({ line: lineNumber, timestamp });
-    
-    // Start fade animation for this line
-    this.startFadeAnimation(lineNumber, timestamp);
+    this.processedLines.add(lineNumber);
     this.updateDecorations();
   }
 
-  private startFadeAnimation(lineNumber: number, timestamp: number) {
-    let step = 0;
-    const fadeInterval = setInterval(() => {
-      step++;
-      if (step >= this.maxFadeSteps) {
-        clearInterval(fadeInterval);
-        // Remove from processed lines when fully faded
-        this.processedLines = this.processedLines.filter(
-          p => p.line !== lineNumber || p.timestamp !== timestamp
-        );
-        this.updateDecorations();
-        return;
-      }
-      this.updateDecorations();
-    }, this.fadeStepDuration);
-
-    this.fadeIntervals.push(fadeInterval);
-  }
-
   private updateDecorations() {
-    const now = Date.now();
+    const ranges = Array.from(this.processedLines).map(line => 
+      new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER)
+    );
     
-    // Group lines by fade level
-    const fadeGroups: vscode.Range[][] = Array(this.maxFadeSteps).fill(null).map(() => []);
-    
-    for (const processed of this.processedLines) {
-      const elapsed = now - processed.timestamp;
-      const fadeStep = Math.min(
-        Math.floor(elapsed / this.fadeStepDuration),
-        this.maxFadeSteps - 1
-      );
-      
-      if (fadeStep < this.maxFadeSteps) {
-        const range = new vscode.Range(
-          processed.line,
-          0,
-          processed.line,
-          Number.MAX_SAFE_INTEGER
-        );
-        fadeGroups[fadeStep].push(range);
-      }
-    }
-
-    // Apply decorations for each fade level
-    fadeGroups.forEach((ranges, index) => {
-      if (index < fadeDecorationTypes.length) {
-        this.editor.setDecorations(fadeDecorationTypes[index], ranges);
-      }
-    });
+    this.editor.setDecorations(processedLineDecorationType, ranges);
   }
 
   shiftDownAfterLine(afterLine: number, offset: number) {
-    this.processedLines = this.processedLines.map(processed => ({
-      ...processed,
-      line: processed.line >= afterLine ? processed.line + offset : processed.line
-    }));
+    const newProcessedLines = new Set<number>();
+    for (const line of this.processedLines) {
+      newProcessedLines.add(line >= afterLine ? line + offset : line);
+    }
+    this.processedLines = newProcessedLines;
     this.updateDecorations();
   }
 
   clear() {
-    // Clear all fade intervals
-    this.fadeIntervals.forEach(interval => clearInterval(interval));
-    this.fadeIntervals = [];
-    
-    // Clear processed lines
-    this.processedLines = [];
-    
-    // Clear all decorations
-    fadeDecorationTypes.forEach(decorationType => {
-      this.editor.setDecorations(decorationType, []);
-    });
+    this.processedLines.clear();
+    this.editor.setDecorations(processedLineDecorationType, []);
   }
 }
 

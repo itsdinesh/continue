@@ -63,7 +63,7 @@ export class VerticalDiffCodeLensProvider implements vscode.CodeLensProvider {
           command: "continue.quickEdit",
         }),
         new vscode.CodeLens(cursorRange, {
-          title: `✘ Reject All (Ctrl+E)`,
+          title: `✘ Reject All (Ctrl+Z)`,
           command: "continue.rejectDiff",
         }),
       );
