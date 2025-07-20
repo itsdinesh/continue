@@ -32,9 +32,28 @@ export class VerticalDiffManager {
   }
 
   private forceRefreshCodeLenses() {
+    // Use multiple aggressive refresh mechanisms to force immediate UI update
     const editor = vscode.window.activeTextEditor;
     if (editor) {
+      // Method 1: Direct CodeLens provider execution
       vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri);
+
+      // Method 2: Force editor to completely refresh by simulating minimize/maximize effect
+      // This mimics what happens when you minimize/maximize VS Code
+      vscode.commands.executeCommand('workbench.action.toggleEditorVisibility').then(() => {
+        setTimeout(() => {
+          vscode.commands.executeCommand('workbench.action.toggleEditorVisibility');
+        }, 1);
+      });
+
+      // Method 3: Force a fake document change to trigger complete refresh
+      const currentPosition = editor.selection.active;
+      const edit = new vscode.WorkspaceEdit();
+      edit.insert(editor.document.uri, currentPosition, '');
+      vscode.workspace.applyEdit(edit).then(() => {
+        // Immediately undo the fake change
+        vscode.commands.executeCommand('undo');
+      });
     }
 
     // Also trigger our own refresh mechanism
@@ -223,6 +242,12 @@ export class VerticalDiffManager {
 
       // Remove the processed block from our array by UUID
       const updatedBlocks = blocks.filter(b => b.id !== blockId);
+
+      // IMMEDIATELY update the state so CodeLens provider sees the change
+      this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+
+      // Force immediate refresh right after state update
+      this.forceRefreshCodeLenses();
 
       // Update the positions of remaining blocks that come after the processed block
       for (let i = 0; i < updatedBlocks.length; i++) {
