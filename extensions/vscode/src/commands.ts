@@ -200,13 +200,31 @@ const getCommandsMap: (
         streamId,
       );
     },
-    "continue.acceptVerticalDiffBlock": (fileUri?: string, index?: number) => {
+    "continue.acceptVerticalDiffBlock": async (fileUri?: string, blockId?: string) => {
       captureCommandTelemetry("acceptVerticalDiffBlock");
-      verticalDiffManager.acceptRejectVerticalDiffBlock(true, fileUri, index);
+      // Process the individual block
+      await verticalDiffManager.acceptRejectVerticalDiffBlock(true, fileUri, blockId);
+
+      // Check if all blocks are processed and use the same cleanup as Accept All
+      if (fileUri) {
+        const blocks = verticalDiffManager.fileUriToCodeLens.get(fileUri);
+        if (!blocks || blocks.length === 0) {
+          void processDiff("accept", sidebar, ide, core, verticalDiffManager, fileUri);
+        }
+      }
     },
-    "continue.rejectVerticalDiffBlock": (fileUri?: string, index?: number) => {
+    "continue.rejectVerticalDiffBlock": async (fileUri?: string, blockId?: string) => {
       captureCommandTelemetry("rejectVerticalDiffBlock");
-      verticalDiffManager.acceptRejectVerticalDiffBlock(false, fileUri, index);
+      // Process the individual block
+      await verticalDiffManager.acceptRejectVerticalDiffBlock(false, fileUri, blockId);
+
+      // Check if all blocks are processed and use the same cleanup as Reject All
+      if (fileUri) {
+        const blocks = verticalDiffManager.fileUriToCodeLens.get(fileUri);
+        if (!blocks || blocks.length === 0) {
+          void processDiff("reject", sidebar, ide, core, verticalDiffManager, fileUri);
+        }
+      }
     },
     "continue.quickFix": async (
       range: vscode.Range,
@@ -346,6 +364,10 @@ const getCommandsMap: (
       captureCommandTelemetry("generateRule");
       focusGUI();
       void sidebar.webviewProtocol?.request("generateRule", undefined);
+    },
+    "continue.quickEdit": async (args?: QuickEditShowParams) => {
+      captureCommandTelemetry("quickEdit");
+      quickEdit.show(args);
     },
     "continue.writeCommentsForCode": async () => {
       captureCommandTelemetry("writeCommentsForCode");

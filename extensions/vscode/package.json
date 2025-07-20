@@ -176,6 +176,12 @@
         "group": "Continue"
       },
       {
+        "command": "continue.quickEdit",
+        "category": "Continue",
+        "title": "Generate Code",
+        "group": "Continue"
+      },
+      {
         "command": "continue.focusEdit",
         "category": "Continue",
         "title": "Edit Highlighted Code",
@@ -370,14 +376,8 @@
       },
       {
         "command": "continue.acceptDiff",
-        "mac": "shift+cmd+enter",
-        "key": "shift+ctrl+enter",
-        "when": "continue.diffVisible"
-      },
-      {
-        "command": "continue.rejectDiff",
-        "mac": "shift+cmd+backspace",
-        "key": "shift+ctrl+backspace",
+        "mac": "cmd+s",
+        "key": "ctrl+s",
         "when": "continue.diffVisible"
       },
       {
@@ -407,6 +407,11 @@
         "command": "continue.rejectVerticalDiffBlock",
         "mac": "alt+cmd+n",
         "key": "alt+ctrl+n"
+      },
+      {
+        "command": "continue.quickEdit",
+        "mac": "alt+k",
+        "key": "alt+k"
       },
       {
         "command": "continue.focusEdit",
@@ -467,6 +472,9 @@
     ],
     "menus": {
       "commandPalette": [
+        {
+          "command": "continue.quickEdit"
+        },
         {
           "command": "continue.focusContinueInput"
         },

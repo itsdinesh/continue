@@ -17,16 +17,32 @@ import { editOutcomeTracker } from "../../extension/EditOutcomeTracker";
 import { VerticalDiffHandler, VerticalDiffHandlerOptions } from "./handler";
 
 export interface VerticalDiffCodeLens {
+  id: string;
   start: number;
   numRed: number;
   numGreen: number;
 }
 
 export class VerticalDiffManager {
-  public refreshCodeLens: () => void = () => {};
+  public refreshCodeLens: () => void = () => { };
+
+  // Event emitter for immediate CodeLens updates
+  private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
+  public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
+
+  // Generate a simple UUID for diff blocks
+  private generateBlockId(): string {
+    return 'block-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now().toString(36);
+  }
+
+  private forceRefreshCodeLenses() {
+    // Just call the refresh function - VS Code will update when it's ready
+    this.refreshCodeLens();
+  }
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
   fileUriToCodeLens: Map<string, VerticalDiffCodeLens[]> = new Map();
+  public fileUriToOriginalCursorPosition: Map<string, vscode.Position> = new Map();
 
   private userChangeListener: vscode.Disposable | undefined;
 
@@ -60,6 +76,7 @@ export class VerticalDiffManager {
         this.clearForfileUri.bind(this),
         this.refreshCodeLens,
         options,
+        this.generateBlockId.bind(this),
       );
       this.fileUriToHandler.set(fileUri, handler);
       return handler;
@@ -139,15 +156,22 @@ export class VerticalDiffManager {
       this.fileUriToHandler.delete(fileUri);
     }
 
+    // Clear ALL stored state for this file
+    this.fileUriToCodeLens.delete(fileUri);
+    this.fileUriToOriginalCursorPosition.delete(fileUri);
+
     this.disableDocumentChangeListener();
 
     vscode.commands.executeCommand("setContext", "continue.diffVisible", false);
+
+    // Force immediate CodeLens refresh to ensure Accept All/Edit & Retry/Reject All buttons disappear
+    this.forceRefreshCodeLenses();
   }
 
   async acceptRejectVerticalDiffBlock(
     accept: boolean,
     fileUri?: string,
-    index?: number,
+    blockId?: string,
   ) {
     if (!fileUri) {
       const activeEditor = vscode.window.activeTextEditor;
@@ -157,40 +181,94 @@ export class VerticalDiffManager {
       fileUri = activeEditor.document.uri.toString();
     }
 
-    if (typeof index === "undefined") {
-      index = 0;
-    }
-
-    const blocks = this.fileUriToCodeLens.get(fileUri);
-    const block = blocks?.[index];
-    if (!blocks || !block) {
+    if (!blockId) {
+      console.warn("No block ID provided for acceptRejectVerticalDiffBlock");
       return;
     }
 
+    const blocks = this.fileUriToCodeLens.get(fileUri);
+    if (!blocks || blocks.length === 0) {
+      return;
+    }
+
+    // Find the block by UUID instead of index
+    const blockIndex = blocks.findIndex(block => block.id === blockId);
+    if (blockIndex === -1) {
+      console.warn(`Block with ID ${blockId} not found`);
+      return;
+    }
+
+    const block = blocks[blockIndex];
     const handler = this.getHandlerForFile(fileUri);
     if (!handler) {
       return;
     }
 
+    // This prevents race conditions and ensures consistent behavior like reject
+    const updatedBlocks = blocks.filter(b => b.id !== blockId);
+
+    // Update state immediately - this is the key to consistent behavior
+    this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+
+    // If no blocks left, clear everything immediately
+    if (updatedBlocks.length === 0) {
+      this.fileUriToCodeLens.delete(fileUri);
+      this.fileUriToOriginalCursorPosition.delete(fileUri);
+    }
+
+    // Force CodeLens refresh - VS Code will update when it's ready
+    this.refreshCodeLens();
+
     // Disable listening to file changes while continue makes changes
     this.disableDocumentChangeListener();
 
-    // CodeLens object removed from editorToVerticalDiffCodeLens here
-    await handler.acceptRejectBlock(
-      accept,
-      block.start,
-      block.numGreen,
-      block.numRed,
-    );
+    try {
+      // Now perform the actual accept/reject operation
+      await handler.acceptRejectBlock(
+        accept,
+        block.start,
+        block.numGreen,
+        block.numRed,
+        true, // Skip status update, we'll handle it ourselves
+      );
 
-    if (blocks.length === 1) {
-      this.clearForfileUri(fileUri, true);
-    } else {
-      // Re-enable listener for user changes to file
+      // Calculate line offset and update remaining block positions
+      if (updatedBlocks.length > 0) {
+        const lineOffset = accept ? -block.numRed : -block.numGreen;
+
+        // Update the positions of remaining blocks that come after the processed block
+        for (let i = 0; i < updatedBlocks.length; i++) {
+          if (updatedBlocks[i].start > block.start) {
+            updatedBlocks[i] = {
+              ...updatedBlocks[i],
+              start: updatedBlocks[i].start + lineOffset,
+            };
+          }
+        }
+
+        // Update with corrected positions
+        this.fileUriToCodeLens.set(fileUri, updatedBlocks);
+
+        // Re-enable listener for user changes to file
+        this.enableDocumentChangeListener();
+
+        // Update status
+        handler.options.onStatusUpdate?.(
+          undefined,
+          updatedBlocks.length,
+          vscode.window.activeTextEditor?.document.getText(),
+        );
+      } else {
+        // All blocks processed - let the commands.ts processDiff handle the cleanup
+        // Don't call clearForfileUri here as it interferes with the processDiff flow
+      }
+    } catch (error) {
+      console.error("Error in acceptRejectVerticalDiffBlock:", error);
+      // Re-enable listener even if there was an error
       this.enableDocumentChangeListener();
+      // Refresh to ensure consistent state
+      this.refreshCodeLens();
     }
-
-    this.refreshCodeLens();
   }
 
   async streamDiffLines(
@@ -315,6 +393,9 @@ export class VerticalDiffManager {
     }
 
     const fileUri = editor.document.uri.toString();
+
+    // Store the original cursor position (start of selection) before the diff starts
+    this.fileUriToOriginalCursorPosition.set(fileUri, editor.selection.start);
 
     let startLine, endLine: number;
 
@@ -468,10 +549,17 @@ export class VerticalDiffManager {
           abortController,
         });
 
+        // Collect all diff lines first instead of streaming them
+        const allDiffLines: DiffLine[] = [];
         for await (const line of stream) {
           if (line.type === "new" || line.type === "same") {
             streamedLines.push(line.line);
           }
+          allDiffLines.push(line);
+        }
+
+        // Now yield all lines at once to show the complete diff
+        for (const line of allDiffLines) {
           yield line;
         }
       }

@@ -157,6 +157,7 @@ export class VsCodeExtension {
         context,
         this.verticalDiffManager.fileUriToCodeLens,
         config,
+        this.verticalDiffManager.fileUriToOriginalCursorPosition,
       );
 
       this.verticalDiffManager.refreshCodeLens =
@@ -187,6 +188,7 @@ export class VsCodeExtension {
             context,
             this.verticalDiffManager.fileUriToCodeLens,
             newConfig,
+            this.verticalDiffManager.fileUriToOriginalCursorPosition,
           );
         }
       },
@@ -245,6 +247,7 @@ export class VsCodeExtension {
       this.ide,
       context,
       this.fileSearch,
+      this.core,
     );
 
     // LLM Log view
