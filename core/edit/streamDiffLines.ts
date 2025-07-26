@@ -1,20 +1,20 @@
 import {
-  ChatMessage,
-  DiffLine,
-  ILLM,
-  Prediction,
-  RuleWithSource,
-  ToolResultChatMessage,
-  UserChatMessage,
+    ChatMessage,
+    DiffLine,
+    ILLM,
+    Prediction,
+    RuleWithSource,
+    ToolResultChatMessage,
+    UserChatMessage,
 } from "../";
 import {
-  filterCodeBlockLines,
-  filterEnglishLinesAtEnd,
-  filterEnglishLinesAtStart,
-  filterLeadingAndTrailingNewLineInsertion,
-  removeTrailingWhitespace,
-  skipLines,
-  stopAtLines,
+    filterCodeBlockLines,
+    filterEnglishLinesAtEnd,
+    filterEnglishLinesAtStart,
+    filterLeadingAndTrailingNewLineInsertion,
+    removeTrailingWhitespace,
+    skipLines,
+    stopAtLines,
 } from "../autocomplete/filtering/streamTransforms/lineStream";
 import { streamDiff } from "../diff/streamDiff";
 import { streamLines } from "../diff/util";
@@ -56,6 +56,32 @@ export async function* addIndentation(
 
 function modelIsInept(model: string): boolean {
   return !(model.includes("gpt") || model.includes("claude"));
+}
+
+async function* filterArtifactTags(lines: AsyncGenerator<string>): AsyncGenerator<string> {
+  let insideArtifact = false;
+  
+  for await (const line of lines) {
+    const trimmedLine = line.trim();
+    
+    // Check for artifact opening tag
+    if (trimmedLine.startsWith('<artifact') && trimmedLine.includes('identifier=')) {
+      insideArtifact = true;
+      continue; // Skip the opening tag line
+    }
+    
+    // Check for artifact closing tag
+    if (trimmedLine === '</artifact>') {
+      insideArtifact = false;
+      continue; // Skip the closing tag line
+    }
+    
+    // If we're not inside an artifact tag, yield the line
+    if (!insideArtifact) {
+      yield line;
+    }
+    // If we're inside an artifact tag, skip the line (don't yield it)
+  }
 }
 
 export async function* streamDiffLines({
@@ -164,6 +190,7 @@ export async function* streamDiffLines({
 
   lines = filterEnglishLinesAtStart(lines);
   lines = filterCodeBlockLines(lines);
+  lines = filterArtifactTags(lines);
   lines = stopAtLines(lines, () => {});
   lines = skipLines(lines);
   lines = removeTrailingWhitespace(lines);

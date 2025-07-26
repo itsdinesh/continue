@@ -3,10 +3,10 @@ import * as URI from "uri-js";
 import * as vscode from "vscode";
 
 import {
-  AddedLineDecorationManager,
-  RemovedLineDecorationManager,
-  belowIndexDecorationType,
-  indexDecorationType,
+    AddedLineDecorationManager,
+    RemovedLineDecorationManager,
+    belowIndexDecorationType,
+    indexDecorationType,
 } from "./decorations";
 
 import type { ApplyState, DiffLine } from "core";
@@ -490,12 +490,21 @@ export class VerticalDiffHandler implements vscode.Disposable {
     await this.editor.edit(
       (editBuilder) => {
         for (const range of ranges) {
-          editBuilder.delete(
-            new vscode.Range(
-              range.start,
-              new vscode.Position(range.end.line + 1, 0),
-            ),
-          );
+          // Check if this is the last line of the document
+          const isLastLine = range.end.line >= this.editor.document.lineCount - 1;
+          
+          if (isLastLine) {
+            // For the last line, only delete the content, not the newline
+            editBuilder.delete(range);
+          } else {
+            // For other lines, include the newline character
+            editBuilder.delete(
+              new vscode.Range(
+                range.start,
+                new vscode.Position(range.end.line + 1, 0),
+              ),
+            );
+          }
         }
       },
       { undoStopAfter: false, undoStopBefore: false },
