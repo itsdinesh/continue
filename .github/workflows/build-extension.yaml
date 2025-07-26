@@ -21,14 +21,28 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - name: Install openai-adapters dependencies
+      - name: Install and build config-types
+        run: |
+          cd ${{ github.workspace }}/packages/config-types
+          npm ci
+          npm run build
+
+      - name: Install and build fetch
+        run: |
+          cd ${{ github.workspace }}/packages/fetch
+          npm ci
+          npm run build
+
+      - name: Install and build config-yaml
+        run: |
+          cd ${{ github.workspace }}/packages/config-yaml
+          npm ci
+          npm run build
+
+      - name: Install and build openai-adapters
         run: |
           cd ${{ github.workspace }}/packages/openai-adapters
           npm ci
-
-      - name: Build openai-adapters
-        run: |
-          cd ${{ github.workspace }}/packages/openai-adapters
           npm run build
 
       - name: Install core dependencies
