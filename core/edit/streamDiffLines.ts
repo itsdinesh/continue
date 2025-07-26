@@ -1,20 +1,20 @@
 import {
-    ChatMessage,
-    DiffLine,
-    ILLM,
-    Prediction,
-    RuleWithSource,
-    ToolResultChatMessage,
-    UserChatMessage,
+  ChatMessage,
+  DiffLine,
+  ILLM,
+  Prediction,
+  RuleWithSource,
+  ToolResultChatMessage,
+  UserChatMessage,
 } from "../";
 import {
-    filterCodeBlockLines,
-    filterEnglishLinesAtEnd,
-    filterEnglishLinesAtStart,
-    filterLeadingAndTrailingNewLineInsertion,
-    removeTrailingWhitespace,
-    skipLines,
-    stopAtLines,
+  filterCodeBlockLines,
+  filterEnglishLinesAtEnd,
+  filterEnglishLinesAtStart,
+  filterLeadingAndTrailingNewLineInsertion,
+  removeTrailingWhitespace,
+  skipLines,
+  stopAtLines,
 } from "../autocomplete/filtering/streamTransforms/lineStream";
 import { streamDiff } from "../diff/streamDiff";
 import { streamLines } from "../diff/util";
@@ -60,22 +60,40 @@ function modelIsInept(model: string): boolean {
 
 async function* filterArtifactTags(lines: AsyncGenerator<string>): AsyncGenerator<string> {
   let insideArtifact = false;
-  
+  let previousLineWasArtifactTag = false;
+
   for await (const line of lines) {
     const trimmedLine = line.trim();
+
+    // Smart artifact tag detection - handles both <artifact> and <artifacts:*> variations
+    const isArtifactOpenTag = trimmedLine.startsWith('<artifact') && 
+      (trimmedLine.includes('identifier=') || trimmedLine.includes('type='));
     
-    // Check for artifact opening tag
-    if (trimmedLine.startsWith('<artifact') && trimmedLine.includes('identifier=')) {
+    const isArtifactCloseTag = trimmedLine.startsWith('</artifact') && trimmedLine.endsWith('>');
+
+    if (isArtifactOpenTag) {
       insideArtifact = true;
+      previousLineWasArtifactTag = true;
       continue; // Skip the opening tag line
     }
-    
-    // Check for artifact closing tag
-    if (trimmedLine === '</artifact>') {
+
+    if (isArtifactCloseTag) {
       insideArtifact = false;
+      previousLineWasArtifactTag = true;
       continue; // Skip the closing tag line
     }
-    
+
+    // Skip empty lines that immediately follow artifact tags
+    if (previousLineWasArtifactTag && trimmedLine === '') {
+      previousLineWasArtifactTag = false;
+      continue; // Skip the empty line after artifact tag
+    }
+
+    // Reset the flag if we encounter a non-empty line
+    if (trimmedLine !== '') {
+      previousLineWasArtifactTag = false;
+    }
+
     // If we're not inside an artifact tag, yield the line
     if (!insideArtifact) {
       yield line;
@@ -119,7 +137,7 @@ export async function* streamDiffLines({
     highlighted.length > 0
       ? highlighted.split("\n")
       : // When highlighted is empty, we need to combine last line of prefix and first line of suffix to determine the line being edited
-        [(prefix + suffix).split("\n")[prefix.split("\n").length - 1]];
+      [(prefix + suffix).split("\n")[prefix.split("\n").length - 1]];
 
   // But if that line is empty, we can assume we are insertion-only
   if (oldLines.length === 1 && oldLines[0].trim() === "") {
@@ -136,20 +154,20 @@ export async function* streamDiffLines({
   // If any rules are present this will result in using chat instead of legacy completion
   const systemMessage = rulesToInclude
     ? getSystemMessageWithRules({
-        availableRules: rulesToInclude,
-        userMessage:
-          typeof prompt === "string"
-            ? ({
-                role: "user",
-                content: prompt,
-              } as UserChatMessage)
-            : (findLast(
-                prompt,
-                (msg) => msg.role === "user" || msg.role === "tool",
-              ) as UserChatMessage | ToolResultChatMessage | undefined),
-        baseSystemMessage: undefined,
-        contextItems: [],
-      }).systemMessage
+      availableRules: rulesToInclude,
+      userMessage:
+        typeof prompt === "string"
+          ? ({
+            role: "user",
+            content: prompt,
+          } as UserChatMessage)
+          : (findLast(
+            prompt,
+            (msg) => msg.role === "user" || msg.role === "tool",
+          ) as UserChatMessage | ToolResultChatMessage | undefined),
+      baseSystemMessage: undefined,
+      contextItems: [],
+    }).systemMessage
     : undefined;
 
   if (systemMessage) {
@@ -191,7 +209,7 @@ export async function* streamDiffLines({
   lines = filterEnglishLinesAtStart(lines);
   lines = filterCodeBlockLines(lines);
   lines = filterArtifactTags(lines);
-  lines = stopAtLines(lines, () => {});
+  lines = stopAtLines(lines, () => { });
   lines = skipLines(lines);
   lines = removeTrailingWhitespace(lines);
   if (inept) {
