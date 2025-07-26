@@ -27,6 +27,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Install and build llm-info
+        run: |
+          cd ${{ github.workspace }}/packages/llm-info
+          npm ci
+          npm run build
+
       - name: Install and build fetch
         run: |
           cd ${{ github.workspace }}/packages/fetch
