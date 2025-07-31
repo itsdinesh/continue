@@ -449,8 +449,8 @@ export async function* removeTrailingWhitespace(
   stream: LineStream,
 ): LineStream {
   for await (const line of stream) {
-    // Remove trailing whitespace and any trailing tilde characters
-    yield line.trimEnd().replace(/~+$/, '');
+    // Remove trailing whitespace and any trailing tilde characters and backticks
+    yield line.trimEnd().replace(/[~`]+$/, '');
   }
 }
 
