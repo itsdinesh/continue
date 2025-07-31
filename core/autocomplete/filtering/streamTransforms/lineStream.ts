@@ -440,17 +440,28 @@ export async function* skipLines(stream: LineStream): LineStream {
 }
 
 /**
- * Handles cases where original lines have a trailing whitespace, but new lines do not.
- * Also removes unwanted tilde characters that may appear at line endings from some APIs.
+ * Removes empty lines at the end of the stream.
  * @param {LineStream} stream - The input stream of lines.
- * @yields {string} Filtered lines that are stripped of trailing whitespace and tilde characters
+ * @yields {string} Filtered lines with trailing empty lines removed
  */
 export async function* removeTrailingWhitespace(
   stream: LineStream,
 ): LineStream {
+  const lines: string[] = [];
+  
+  // Collect all lines
   for await (const line of stream) {
-    // Remove trailing whitespace and any trailing tilde characters and backticks
-    yield line.trimEnd().replace(/[~`]+$/, '');
+    lines.push(line);
+  }
+  
+  // Remove empty lines from the end
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop();
+  }
+  
+  // Yield the remaining lines
+  for (const line of lines) {
+    yield line;
   }
 }
 
