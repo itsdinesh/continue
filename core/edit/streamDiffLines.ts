@@ -1,20 +1,21 @@
 import {
-  ChatMessage,
-  DiffLine,
-  ILLM,
-  Prediction,
-  RuleWithSource,
-  ToolResultChatMessage,
-  UserChatMessage,
+    ChatMessage,
+    DiffLine,
+    ILLM,
+    Prediction,
+    RuleWithSource,
+    ToolResultChatMessage,
+    UserChatMessage,
 } from "../";
 import {
-  filterCodeBlockLines,
-  filterEnglishLinesAtEnd,
-  filterEnglishLinesAtStart,
-  filterLeadingAndTrailingNewLineInsertion,
-  removeTrailingWhitespace,
-  skipLines,
-  stopAtLines,
+    filterCodeBlockLines,
+    filterEnglishLinesAtEnd,
+    filterEnglishLinesAtStart,
+    filterLeadingAndTrailingNewLineInsertion,
+    filterTrailingCodeBlocks,
+    removeTrailingWhitespace,
+    skipLines,
+    stopAtLines,
 } from "../autocomplete/filtering/streamTransforms/lineStream";
 import { streamDiff } from "../diff/streamDiff";
 import { streamLines } from "../diff/util";
@@ -212,6 +213,7 @@ export async function* streamDiffLines({
   lines = stopAtLines(lines, () => { });
   lines = skipLines(lines);
   lines = removeTrailingWhitespace(lines);
+  lines = filterTrailingCodeBlocks(lines);
   if (inept) {
     // lines = fixCodeLlamaFirstLineIndentation(lines);
     lines = filterEnglishLinesAtEnd(lines);

@@ -685,3 +685,37 @@ export async function* noDoubleNewLine(lines: LineStream): LineStream {
     yield line;
   }
 }
+
+/**
+ * Filters out trailing code block markers that might appear at the end of a stream.
+ * This is specifically for cases where the AI model wraps code in markdown blocks
+ * but the closing backticks aren't properly filtered by other filters.
+ * @param {LineStream} lines - The input stream of lines.
+ * @yields {string} Filtered lines with trailing code block markers removed.
+ */
+export async function* filterTrailingCodeBlocks(lines: LineStream): LineStream {
+  const allLines: string[] = [];
+  
+  // Collect all lines first
+  for await (const line of lines) {
+    allLines.push(line);
+  }
+  
+  // Remove trailing lines that are just closing code block markers
+  while (allLines.length > 0) {
+    const lastLine = allLines[allLines.length - 1];
+    const trimmed = lastLine.trim();
+    
+    // Remove if it's just closing backticks or empty
+    if (trimmed === "```" || trimmed === "" || trimmed === "[/CODE]") {
+      allLines.pop();
+    } else {
+      break;
+    }
+  }
+  
+  // Yield the filtered lines
+  for (const line of allLines) {
+    yield line;
+  }
+}
