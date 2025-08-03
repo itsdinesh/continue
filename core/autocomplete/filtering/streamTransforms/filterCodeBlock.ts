@@ -1,13 +1,13 @@
 import { LineStream } from "../../../diff/util";
 
 import {
-    collectAllLines,
-    MarkdownBlockStateTracker,
+  collectAllLines,
+  MarkdownBlockStateTracker,
 } from "../../../utils/markdownUtils";
 
 import {
-    processBlockNesting,
-    shouldStopAtMarkdownBlock,
+  processBlockNesting,
+  shouldStopAtMarkdownBlock,
 } from "../../../utils/streamMarkdownUtils";
 
 import { hasNestedMarkdownBlocks, shouldChangeLineAndStop } from "./lineStream";
@@ -61,31 +61,6 @@ export async function* filterCodeBlockLines(
         continue;
       }
 
-      yield line;
-    }
-    return;
-  }
-
-  // Check if we have trailing ``` without opening fence (common in inline edits)
-  const hasTrailingBackticks = allLines.length > 0 && 
-    allLines[allLines.length - 1].trim() === "```" &&
-    !allLines.some((line, index) => index < allLines.length - 1 && line.trim().startsWith("```"));
-
-  // If we have trailing backticks without opening fence, remove them
-  if (hasTrailingBackticks) {
-    // Remove trailing empty lines and closing backticks
-    while (allLines.length > 0) {
-      const lastLine = allLines[allLines.length - 1];
-      const trimmed = lastLine.trim();
-      if (trimmed === "```" || trimmed === "") {
-        allLines.pop();
-      } else {
-        break;
-      }
-    }
-    
-    // Yield the remaining lines
-    for (const line of allLines) {
       yield line;
     }
     return;
@@ -156,9 +131,6 @@ export async function* filterCodeBlockLines(
         // Otherwise just yield the line as content
         yield line;
       }
-    } else {
-      // Not inside a block, just yield the line
-      yield line;
     }
   }
 }
