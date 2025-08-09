@@ -1,20 +1,20 @@
 import {
-  ChatMessage,
-  DiffLine,
-  ILLM,
-  Prediction,
-  RuleWithSource,
-  ToolResultChatMessage,
-  UserChatMessage,
+    ChatMessage,
+    DiffLine,
+    ILLM,
+    Prediction,
+    RuleWithSource,
+    ToolResultChatMessage,
+    UserChatMessage,
 } from "../";
 import {
-  filterCodeBlockLines,
-  filterEnglishLinesAtEnd,
-  filterEnglishLinesAtStart,
-  filterLeadingAndTrailingNewLineInsertion,
-  removeTrailingWhitespace,
-  skipLines,
-  stopAtLines
+    filterCodeBlockLines,
+    filterEnglishLinesAtEnd,
+    filterEnglishLinesAtStart,
+    filterLeadingAndTrailingNewLineInsertion,
+    removeTrailingWhitespace,
+    skipLines,
+    stopAtLines
 } from "../autocomplete/filtering/streamTransforms/lineStream";
 import { streamDiff } from "../diff/streamDiff";
 import { streamLines } from "../diff/util";
@@ -112,6 +112,7 @@ export async function* streamDiffLines({
   language,
   overridePrompt,
   rulesToInclude,
+  isSelectionAtEndOfFile,
 }: {
   prefix: string;
   highlighted: string;
@@ -122,6 +123,7 @@ export async function* streamDiffLines({
   language: string | undefined;
   overridePrompt: ChatMessage[] | undefined;
   rulesToInclude: RuleWithSource[] | undefined;
+  isSelectionAtEndOfFile?: boolean;
 }): AsyncGenerator<DiffLine> {
   void Telemetry.capture(
     "inlineEdit",
@@ -218,7 +220,7 @@ export async function* streamDiffLines({
   }
 
   let diffLines = streamDiff(oldLines, lines);
-  diffLines = filterLeadingAndTrailingNewLineInsertion(diffLines);
+  diffLines = filterLeadingAndTrailingNewLineInsertion(diffLines, isSelectionAtEndOfFile);
   if (highlighted.length === 0) {
     const line = prefix.split("\n").slice(-1)[0];
     const indentation = line.slice(0, line.length - line.trimStart().length);

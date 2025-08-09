@@ -501,6 +501,10 @@ export class VerticalDiffManager {
       llm.contextLength / 4,
       llm.model,
     );
+    
+    // Check if selection goes to the end of the file
+    const isSelectionAtEndOfFile = selectedRange.end.line >= editor.document.lineCount - 1 &&
+      selectedRange.end.character >= editor.document.lineAt(editor.document.lineCount - 1).text.length;
 
     let overridePrompt: ChatMessage[] | undefined;
     if (llm.promptTemplates?.apply) {
@@ -547,6 +551,7 @@ export class VerticalDiffManager {
           language: getMarkdownLanguageTagForFile(fileUri),
           overridePrompt,
           abortController,
+          isSelectionAtEndOfFile,
         });
 
         // Collect all diff lines first instead of streaming them
@@ -556,6 +561,14 @@ export class VerticalDiffManager {
             streamedLines.push(line.line);
           }
           allDiffLines.push(line);
+        }
+
+        // If selection is at end of file, remove trailing empty lines from streamedLines
+        // This prevents unwanted newlines when the final content is assembled
+        if (isSelectionAtEndOfFile) {
+          while (streamedLines.length > 0 && streamedLines[streamedLines.length - 1].trim() === "") {
+            streamedLines.pop();
+          }
         }
 
         // Now yield all lines at once to show the complete diff

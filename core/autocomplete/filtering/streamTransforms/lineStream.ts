@@ -553,6 +553,7 @@ export async function* fixCodeLlamaFirstLineIndentation(lines: LineStream) {
  */
 export async function* filterLeadingAndTrailingNewLineInsertion(
   diffLines: AsyncGenerator<DiffLine>,
+  isSelectionAtEndOfFile?: boolean,
 ): AsyncGenerator<DiffLine> {
   let isFirst = true;
   let buffer: DiffLine[] = [];
@@ -579,6 +580,14 @@ export async function* filterLeadingAndTrailingNewLineInsertion(
         }
       }
       yield diffLine;
+    }
+  }
+
+  // If selection is at end of file, don't yield any buffered trailing blank lines
+  // This prevents adding unwanted newlines when the entire file is selected
+  if (!isSelectionAtEndOfFile) {
+    while (buffer.length > 0) {
+      yield buffer.shift()!;
     }
   }
 }
