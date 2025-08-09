@@ -61,6 +61,16 @@ jobs:
           cd ${{ github.workspace }}/extensions/vscode
           npm ci
 
+      - name: Install GUI dependencies
+        run: |
+          cd ${{ github.workspace }}/gui
+          npm ci
+
+      - name: Build GUI
+        run: |
+          cd ${{ github.workspace }}/gui
+          npm run build
+
       - name: Prepackage the extension
         run: |
           cd ${{ github.workspace }}/extensions/vscode
