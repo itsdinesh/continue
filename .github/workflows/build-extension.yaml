@@ -9,7 +9,11 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -89,5 +93,5 @@ jobs:
       - name: Upload .vsix artifact
         uses: actions/upload-artifact@v4
         with:
-          name: continue-universal-vsix
+          name: continue-universal-vsix-${{ matrix.os }}
           path: extensions/vscode/*.vsix
