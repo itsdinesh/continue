@@ -263,8 +263,8 @@ export class QuickEdit {
     prompt: string,
     path: string | undefined,
   ) => {
-    const modelTitle = await this.getCurModel();
-    if (!modelTitle) {
+    const model = await this.getCurModel();
+    if (!model) {
       throw new Error("No model selected");
     }
 
@@ -448,6 +448,7 @@ export class QuickEdit {
     const quickPick = vscode.window.createQuickPick();
     this._currentQuickPick = quickPick; // Store reference for real-time updates
 
+    const modelTitle = await this.getCurModelTitle();
     const initialItems = this.getInitialItems(modelTitle);
     quickPick.items = initialItems;
     quickPick.placeholder =
