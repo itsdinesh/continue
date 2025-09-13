@@ -1,4 +1,9 @@
-import { ChatMessage, ModelCapability, TemplateType } from "../index.js";
+import {
+  ChatMessage,
+  ModelCapability,
+  ModelDescription,
+  TemplateType,
+} from "../index.js";
 import { NEXT_EDIT_MODELS } from "./constants.js";
 
 import {
@@ -126,6 +131,26 @@ function modelSupportsImages(
 
   return false;
 }
+
+function modelSupportsReasoning(
+  model: ModelDescription | null | undefined,
+): boolean {
+  if (!model) {
+    return false;
+  }
+  if ("anthropic" === model.underlyingProviderName) {
+    return true;
+  }
+  if (model.model.includes("deepseek-r")) {
+    return true;
+  }
+  if (model.completionOptions?.reasoning) {
+    // Reasoning support is forced at the config level. Model might not necessarily support it though!
+    return true;
+  }
+  return false;
+}
+
 const PARALLEL_PROVIDERS: string[] = [
   "anthropic",
   "bedrock",
@@ -177,7 +202,7 @@ function isProviderHandlesTemplatingOrNoTemplateTypeRequired(
 // NOTE: When updating this list,
 // update core/nextEdit/templating/NextEditPromptEngine.ts as well.
 const MODEL_SUPPORTS_NEXT_EDIT: string[] = [
-  NEXT_EDIT_MODELS.MERCURY_CODER_NEXTEDIT,
+  NEXT_EDIT_MODELS.MERCURY_CODER,
   NEXT_EDIT_MODELS.INSTINCT,
 ];
 
@@ -421,4 +446,5 @@ export {
   llmCanGenerateInParallel,
   modelSupportsImages,
   modelSupportsNextEdit,
+  modelSupportsReasoning,
 };
