@@ -55,6 +55,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Install and build terminal-security
+        run: |
+          cd ${{ github.workspace }}/packages/terminal-security
+          npm ci
+          npm run build
+
       - name: Install core dependencies
         run: |
           cd ${{ github.workspace }}/core
