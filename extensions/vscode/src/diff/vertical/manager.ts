@@ -13,6 +13,7 @@ import { VsCodeWebviewProtocol } from "../../webviewProtocol";
 import { ApplyAbortManager } from "core/edit/applyAbortManager";
 import { EDIT_MODE_STREAM_ID } from "core/edit/constants";
 import { stripImages } from "core/util/messageContent";
+import { getLastNPathParts } from "core/util/uri";
 import { editOutcomeTracker } from "../../extension/EditOutcomeTracker";
 import { VerticalDiffHandler, VerticalDiffHandlerOptions } from "./handler";
 
@@ -66,7 +67,7 @@ export class VerticalDiffManager {
       this.fileUriToHandler.get(fileUri)?.clear(false);
       this.fileUriToHandler.delete(fileUri);
     }
-    const editor = vscode.window.activeTextEditor; // TODO might cause issues if user switches files
+    const editor = vscode.window.activeTextEditor;
     if (editor && URI.equal(editor.document.uri.toString(), fileUri)) {
       const handler = new VerticalDiffHandler(
         startLine,
@@ -162,7 +163,16 @@ export class VerticalDiffManager {
 
     this.disableDocumentChangeListener();
 
-    vscode.commands.executeCommand("setContext", "continue.diffVisible", false);
+    void vscode.commands.executeCommand(
+      "setContext",
+      "continue.diffVisible",
+      false,
+    );
+
+    void this.webviewProtocol.request(
+      "focusContinueInputWithoutClear",
+      undefined,
+    );
 
     // Force immediate CodeLens refresh to ensure Accept All/Edit & Retry/Reject All buttons disappear
     this.forceRefreshCodeLenses();
@@ -370,6 +380,7 @@ export class VerticalDiffManager {
     newCode,
     toolCallId,
     rulesToInclude,
+    isApply,
   }: {
     input: string;
     llm: ILLM;
@@ -379,6 +390,7 @@ export class VerticalDiffManager {
     newCode?: string;
     toolCallId?: string;
     rulesToInclude: undefined | RuleWithSource[];
+    isApply: boolean;
   }): Promise<string | undefined> {
     void vscode.commands.executeCommand(
       "setContext",
@@ -508,9 +520,11 @@ export class VerticalDiffManager {
 
     let overridePrompt: ChatMessage[] | undefined;
     if (llm.promptTemplates?.apply) {
+      const filepath = getLastNPathParts(fileUri, 1);
       const rendered = llm.renderPromptTemplate(llm.promptTemplates.apply, [], {
         original_code: rangeContent,
         new_code: newCode ?? "",
+        filepath,
       });
       overridePrompt =
         typeof rendered === "string"
@@ -541,18 +555,24 @@ export class VerticalDiffManager {
       const streamedLines: string[] = [];
 
       async function* recordedStream() {
-        const stream = streamDiffLines({
-          highlighted: rangeContent,
-          prefix,
-          suffix,
+        const stream = streamDiffLines(
+          {
+            highlighted: rangeContent,
+            prefix,
+            suffix,
+            input,
+            language: getMarkdownLanguageTagForFile(fileUri),
+            type: isApply ? "apply" : "edit",
+            newCode: newCode ?? "",
+            includeRulesInSystemMessage: !!rulesToInclude && !isApply,
+            modelTitle: llm.title ?? llm.model,
+          },
           llm,
-          rulesToInclude,
-          input,
-          language: getMarkdownLanguageTagForFile(fileUri),
-          overridePrompt,
           abortController,
+          overridePrompt,
+          rulesToInclude,
           isSelectionAtEndOfFile,
-        });
+        );
 
         // Collect all diff lines first instead of streaming them
         const allDiffLines: DiffLine[] = [];

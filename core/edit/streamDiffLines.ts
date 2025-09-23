@@ -1,25 +1,27 @@
 import {
-    ChatMessage,
-    DiffLine,
-    ILLM,
-    Prediction,
-    RuleWithSource,
-    ToolResultChatMessage,
-    UserChatMessage,
+  ChatMessage,
+  DiffLine,
+  ILLM,
+  Prediction,
+  RuleWithSource,
+  StreamDiffLinesPayload,
+  ToolResultChatMessage,
+  UserChatMessage,
 } from "../";
 import {
-    filterCodeBlockLines,
-    filterEnglishLinesAtEnd,
-    filterEnglishLinesAtStart,
-    filterLeadingAndTrailingNewLineInsertion,
-    removeTrailingWhitespace,
-    skipLines,
-    stopAtLines
+  filterCodeBlockLines,
+  filterEnglishLinesAtEnd,
+  filterEnglishLinesAtStart,
+  filterLeadingAndTrailingNewLineInsertion,
+  removeTrailingWhitespace,
+  skipLines,
+  stopAtLines
 } from "../autocomplete/filtering/streamTransforms/lineStream";
 import { streamDiff } from "../diff/streamDiff";
 import { streamLines } from "../diff/util";
 import { getSystemMessageWithRules } from "../llm/rules/getSystemMessageWithRules";
 import { gptEditPrompt } from "../llm/templates/edit";
+import { defaultApplyPrompt } from "../llm/templates/edit/gpt";
 import { findLast } from "../util/findLast";
 import { Telemetry } from "../util/posthog";
 import { recursiveStream } from "./recursiveStream";
@@ -40,6 +42,20 @@ function constructEditPrompt(
     suffix,
     language: language ?? "",
   });
+}
+
+function constructApplyPrompt(
+  originalCode: string,
+  newCode: string,
+  llm: ILLM,
+) {
+  const template = llm.promptTemplates?.apply ?? defaultApplyPrompt;
+  const rendered = llm.renderPromptTemplate(template, [], {
+    original_code: originalCode,
+    new_code: newCode,
+  });
+
+  return rendered;
 }
 
 export async function* addIndentation(
@@ -102,29 +118,16 @@ async function* filterArtifactTags(lines: AsyncGenerator<string>): AsyncGenerato
   }
 }
 
-export async function* streamDiffLines({
-  prefix,
-  highlighted,
-  suffix,
-  llm,
-  abortController,
-  input,
-  language,
-  overridePrompt,
-  rulesToInclude,
-  isSelectionAtEndOfFile,
-}: {
-  prefix: string;
-  highlighted: string;
-  suffix: string;
-  llm: ILLM;
-  abortController: AbortController;
-  input: string;
-  language: string | undefined;
-  overridePrompt: ChatMessage[] | undefined;
-  rulesToInclude: RuleWithSource[] | undefined;
-  isSelectionAtEndOfFile?: boolean;
-}): AsyncGenerator<DiffLine> {
+export async function* streamDiffLines(
+  options: StreamDiffLinesPayload,
+  llm: ILLM,
+  abortController: AbortController,
+  overridePrompt: ChatMessage[] | undefined,
+  rulesToInclude: RuleWithSource[] | undefined,
+  isSelectionAtEndOfFile?: boolean,
+): AsyncGenerator<DiffLine> {
+  const { type, prefix, highlighted, suffix, input, language } = options;
+
   void Telemetry.capture(
     "inlineEdit",
     {
@@ -150,27 +153,30 @@ export async function* streamDiffLines({
   // For apply can be overridden with simply apply prompt
   let prompt =
     overridePrompt ??
-    constructEditPrompt(prefix, highlighted, suffix, llm, input, language);
+    (type === "apply"
+      ? constructApplyPrompt(oldLines.join("\n"), options.newCode, llm)
+      : constructEditPrompt(prefix, highlighted, suffix, llm, input, language));
 
   // Rules can be included with edit prompt
   // If any rules are present this will result in using chat instead of legacy completion
-  const systemMessage = rulesToInclude
-    ? getSystemMessageWithRules({
-      availableRules: rulesToInclude,
-      userMessage:
-        typeof prompt === "string"
-          ? ({
-            role: "user",
-            content: prompt,
-          } as UserChatMessage)
-          : (findLast(
-            prompt,
-            (msg) => msg.role === "user" || msg.role === "tool",
-          ) as UserChatMessage | ToolResultChatMessage | undefined),
-      baseSystemMessage: undefined,
-      contextItems: [],
-    }).systemMessage
-    : undefined;
+  const systemMessage =
+    rulesToInclude || llm.baseChatSystemMessage
+      ? getSystemMessageWithRules({
+          availableRules: rulesToInclude ?? [],
+          userMessage:
+            typeof prompt === "string"
+              ? ({
+                  role: "user",
+                  content: prompt,
+                } as UserChatMessage)
+              : (findLast(
+                  prompt,
+                  (msg) => msg.role === "user" || msg.role === "tool",
+                ) as UserChatMessage | ToolResultChatMessage | undefined),
+          baseSystemMessage: llm.baseChatSystemMessage,
+          contextItems: [],
+        }).systemMessage
+      : undefined;
 
   if (systemMessage) {
     if (typeof prompt === "string") {
@@ -204,7 +210,13 @@ export async function* streamDiffLines({
     content: highlighted,
   };
 
-  const completion = recursiveStream(llm, abortController, prompt, prediction);
+  const completion = recursiveStream(
+    llm,
+    abortController,
+    type,
+    prompt,
+    prediction,
+  );
 
   let lines = streamLines(completion);
 

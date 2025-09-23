@@ -16,6 +16,7 @@ import { streamThunkWrapper } from "./streamThunkWrapper";
  */
 function areAllToolsDoneStreaming(
   assistantMessage: ChatHistoryItemWithMessageId | undefined,
+  continueAfterToolRejection: boolean | undefined,
 ): boolean {
   // This might occur because of race conditions, if so, the tools are completed
   if (!assistantMessage?.toolCallStates) {
@@ -24,7 +25,10 @@ function areAllToolsDoneStreaming(
 
   // Only continue if all tool calls are complete
   const completedToolCalls = assistantMessage.toolCallStates.filter(
-    (tc) => tc.status === "done" || tc.status === "errored",
+    (tc) =>
+      tc.status === "done" ||
+      tc.status === "errored" ||
+      (continueAfterToolRejection && tc.status === "canceled"),
   );
 
   return completedToolCalls.length === assistantMessage.toolCallStates.length;
@@ -65,13 +69,18 @@ export const streamResponseAfterToolCall = createAsyncThunk<
 
         // Check if we should continue streaming based on tool call completion
         const history = getState().session.history;
-        const assistantMessage = history.find(
+        const assistantMessage = history.findLast(
           (item) =>
             item.message.role === "assistant" &&
             item.toolCallStates?.some((tc) => tc.toolCallId === toolCallId),
         );
 
-        if (areAllToolsDoneStreaming(assistantMessage)) {
+        if (
+          areAllToolsDoneStreaming(
+            assistantMessage,
+            state.config.config.ui?.continueAfterToolRejection,
+          )
+        ) {
           unwrapResult(await dispatch(streamNormalInput({})));
         }
       }),

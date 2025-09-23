@@ -414,6 +414,7 @@ export class QuickEdit {
       quickEdit: this.previousInput,
       range: this.range,
       rulesToInclude: rules,
+      isApply: false,
     });
   }
 
