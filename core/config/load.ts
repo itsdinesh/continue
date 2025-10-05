@@ -7,6 +7,7 @@ import { IDE, ILLM } from "../index.js";
 import {
   ConfigResult,
   ConfigValidationError,
+  mergeConfigYamlRequestOptions,
   ModelRole,
 } from "@continuedev/config-yaml";
 import * as JSONC from "comment-json";
@@ -24,6 +25,7 @@ import {
   IdeSettings,
   IdeType,
   ILLMLogger,
+  InternalMcpOptions,
   LLMOptions,
   ModelDescription,
   RerankerDescription,
@@ -56,9 +58,10 @@ import {
 } from "../util/paths";
 import { localPathToUri } from "../util/pathToUri";
 
+import { loadJsonMcpConfigs } from "../context/mcp/json/loadJsonMcpConfigs";
 import CustomContextProviderClass from "../context/providers/CustomContextProvider";
 import { PolicySingleton } from "../control-plane/PolicySingleton";
-import { getBaseToolDefinitions } from "../tools";
+import { getBaseToolDefinitions, serializeTool } from "../tools";
 import { resolveRelativePathInDir } from "../util/ideUtils";
 import { getWorkspaceRcConfigs } from "./json/loadRcConfigs";
 import { loadConfigContextProviders } from "./loadContextProviders";
@@ -550,17 +553,27 @@ async function intermediateToFinalConfig({
   if (orgPolicy?.policy?.allowMcpServers === false) {
     await mcpManager.shutdown();
   } else {
-    mcpManager.setConnections(
-      (config.experimental?.modelContextProtocolServers ?? []).map(
-        (server, index) => ({
-          id: `continue-mcp-server-${index + 1}`,
-          name: `MCP Server`,
-          ...server,
-          requestOptions: config.requestOptions,
-        }),
+    const mcpOptions: InternalMcpOptions[] = (
+      config.experimental?.modelContextProtocolServers ?? []
+    ).map((server, index) => ({
+      id: `continue-mcp-server-${index + 1}`,
+      name: `MCP Server`,
+      requestOptions: mergeConfigYamlRequestOptions(
+        server.transport.type !== "stdio"
+          ? server.transport.requestOptions
+          : undefined,
+        config.requestOptions,
       ),
-      false,
+      ...server.transport,
+    }));
+    const { errors: jsonMcpErrors, mcpServers } = await loadJsonMcpConfigs(
+      ide,
+      true,
+      config.requestOptions,
     );
+    errors.push(...jsonMcpErrors);
+    mcpOptions.push(...mcpServers);
+    mcpManager.setConnections(mcpOptions, false);
   }
 
   // Handle experimental modelRole config values for apply and edit
@@ -659,7 +672,7 @@ async function finalToBrowserConfig(
     experimental: final.experimental,
     rules: final.rules,
     docs: final.docs,
-    tools: final.tools,
+    tools: final.tools.map(serializeTool),
     mcpServerStatuses: final.mcpServerStatuses,
     tabAutocompleteOptions: final.tabAutocompleteOptions,
     usePlatform: await useHub(ide.getIdeSettings()),
