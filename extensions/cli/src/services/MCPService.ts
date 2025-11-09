@@ -1,6 +1,9 @@
 import { type AssistantConfig } from "@continuedev/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import {
+  SSEClientTransport,
+  SseError,
+} from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
@@ -21,6 +24,14 @@ import {
   SERVICE_NAMES,
 } from "./types.js";
 
+function is401Error(error: unknown) {
+  return (
+    (error instanceof SseError && error.code === 401) ||
+    (error instanceof Error && error.message.includes("401")) ||
+    (error instanceof Error && error.message.includes("Unauthorized"))
+  );
+}
+
 interface ServerConnection extends MCPConnectionInfo {
   client: Client | null;
 }
@@ -39,9 +50,10 @@ export class MCPService
   private connections: Map<string, ServerConnection> = new Map();
   private assistant: AssistantConfig | null = null;
   private isShuttingDown = false;
+  private isHeadless = false;
 
   getDependencies(): string[] {
-    return [SERVICE_NAMES.AUTH, SERVICE_NAMES.API_CLIENT, SERVICE_NAMES.CONFIG];
+    return [SERVICE_NAMES.CONFIG];
   }
   constructor() {
     super("MCPService", {
@@ -65,6 +77,9 @@ export class MCPService
       configName: assistant.name,
       serverCount: assistant.mcpServers?.length || 0,
     });
+
+    // Store headless mode flag
+    this.isHeadless = waitForConnections;
 
     await this.shutdownConnections();
 
@@ -92,6 +107,19 @@ export class MCPService
     );
     if (waitForConnections) {
       await connectionInit;
+
+      // In headless mode, throw error if any MCP server failed to connect
+      const failedConnections = Array.from(this.connections.values()).filter(
+        (c) => c.status === "error",
+      );
+      if (failedConnections.length > 0) {
+        const errorMessages = failedConnections.map(
+          (c) => `${c.config?.name}: ${c.error}`,
+        );
+        throw new Error(
+          `MCP server(s) failed to load in headless mode:\n${errorMessages.join("\n")}`,
+        );
+      }
     } else {
       this.updateState();
     }
@@ -248,6 +276,13 @@ export class MCPService
             name: serverName,
             error: errorMessage,
           });
+
+          // In headless mode, throw error on capability failures
+          if (this.isHeadless) {
+            throw new Error(
+              `Failed to load prompts from MCP server ${serverName}: ${errorMessage}`,
+            );
+          }
         }
       }
 
@@ -265,18 +300,30 @@ export class MCPService
             name: serverName,
             error: errorMessage,
           });
+
+          // In headless mode, throw error on capability failures
+          if (this.isHeadless) {
+            throw new Error(
+              `Failed to load tools from MCP server ${serverName}: ${errorMessage}`,
+            );
+          }
         }
       }
 
-      logger.debug("MCP server restarted successfully", { name: serverName });
+      logger.debug("MCP server connected successfully", { name: serverName });
     } catch (error) {
       const errorMessage = getErrorString(error);
       connection.status = "error";
       connection.error = errorMessage;
-      logger.error("Failed to restart MCP server", {
+      logger.error("Failed to connect to MCP server", {
         name: serverName,
         error: errorMessage,
       });
+
+      // In headless mode, re-throw the error to fail fast
+      if (this.isHeadless) {
+        throw error;
+      }
     }
 
     this.updateState();
@@ -366,15 +413,29 @@ export class MCPService
         url: serverConfig.url,
       });
 
-      if (serverConfig.type === "sse") {
-        const transport = this.constructSseTransport(serverConfig);
-        await client.connect(transport, {});
-      } else if (serverConfig.type === "streamable-http") {
-        const transport = this.constructHttpTransport(serverConfig);
-        await client.connect(transport, {});
-      } else if (serverConfig.type) {
-        throw new Error(`Unsupported transport type: ${serverConfig.type}`);
-      } else {
+      try {
+        if (serverConfig.type === "sse") {
+          const transport = this.constructSseTransport(serverConfig);
+          await client.connect(transport, {});
+        } else if (serverConfig.type === "streamable-http") {
+          const transport = this.constructHttpTransport(serverConfig);
+          await client.connect(transport, {});
+        }
+      } catch (error: unknown) {
+        // on authorization error, use "mcp-remote" with stdio transport to connect
+        if (is401Error(error)) {
+          const transport = this.constructStdioTransport({
+            name: serverConfig.name,
+            command: "npx",
+            args: ["-y", "mcp-remote", serverConfig.url],
+          });
+          await client.connect(transport, {});
+        } else {
+          throw error;
+        }
+      }
+
+      if (typeof serverConfig.type === "undefined") {
         try {
           const transport = this.constructHttpTransport(serverConfig);
           await client.connect(transport, {});
@@ -394,6 +455,10 @@ export class MCPService
             );
           }
         }
+      } else if (
+        !["streamable-http", "sse", "stdio"].includes(serverConfig.type)
+      ) {
+        throw new Error(`Unsupported transport type: ${serverConfig.type}`);
       }
     }
 
@@ -403,6 +468,14 @@ export class MCPService
   private constructSseTransport(
     serverConfig: SseMcpServer,
   ): SSEClientTransport {
+    // Merge apiKey into headers if provided
+    const headers = {
+      ...serverConfig.requestOptions?.headers,
+      ...(serverConfig.apiKey && {
+        Authorization: `Bearer ${serverConfig.apiKey}`,
+      }),
+    };
+
     return new SSEClientTransport(new URL(serverConfig.url), {
       eventSourceInit: {
         fetch: (input, init) =>
@@ -410,26 +483,38 @@ export class MCPService
             ...init,
             headers: {
               ...init?.headers,
-              ...serverConfig.requestOptions?.headers,
+              ...headers,
             },
           }),
       },
-      requestInit: { headers: serverConfig.requestOptions?.headers },
+      requestInit: { headers },
     });
   }
   private constructHttpTransport(
     serverConfig: HttpMcpServer,
   ): StreamableHTTPClientTransport {
+    // Merge apiKey into headers if provided
+    const headers = {
+      ...serverConfig.requestOptions?.headers,
+      ...(serverConfig.apiKey && {
+        Authorization: `Bearer ${serverConfig.apiKey}`,
+      }),
+    };
+
     return new StreamableHTTPClientTransport(new URL(serverConfig.url), {
-      requestInit: { headers: serverConfig.requestOptions?.headers },
+      requestInit: { headers },
     });
   }
   private constructStdioTransport(
     serverConfig: StdioMcpServer,
   ): StdioClientTransport {
     const env: Record<string, string> = serverConfig.env || {};
-    if (process.env.PATH !== undefined) {
-      env.PATH = process.env.PATH;
+    if (process.env) {
+      for (const [key, value] of Object.entries(process.env)) {
+        if (!(key in env) && !!value) {
+          env[key] = value;
+        }
+      }
     }
 
     return new StdioClientTransport({

@@ -6,6 +6,7 @@ const baseMcpServerSchema = z.object({
   serverName: z.string().optional(),
   faviconUrl: z.string().optional(),
   sourceFile: z.string().optional(), // Added during loading
+  sourceSlug: z.string().optional(), // Added during loading
   connectionTimeout: z.number().gt(0).optional(),
 });
 
@@ -21,6 +22,7 @@ export type StdioMcpServer = z.infer<typeof stdioMcpServerSchema>;
 const sseOrHttpMcpServerSchema = baseMcpServerSchema.extend({
   url: z.string(), // .url() fails with e.g. IP addresses
   type: z.union([z.literal("sse"), z.literal("streamable-http")]).optional(),
+  apiKey: z.string().optional(),
   requestOptions: requestOptionsSchema.optional(),
 });
 export type SseMcpServer = z.infer<typeof sseOrHttpMcpServerSchema>;

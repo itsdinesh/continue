@@ -95,7 +95,7 @@ The easiest way to get started is using our pre-configured documentation agent:
     Visit [the Docs Assistant - Mintlify in the Hub](https://hub.continue.dev/continuedev/docs-mintlify) and click "Install" to add it to your Continue setup. This agent comes pre-configured with all our documentation standards.
 
     <Info>
-    Learn more about Continue Agents in our [agent documentation](/guides/understanding-agents).
+    Learn more about Continue Configs in our [config documentation](/guides/understanding-configs).
     </Info>
   </Step>
   
@@ -126,7 +126,7 @@ The easiest way to get started is using our pre-configured documentation agent:
 </Steps>
 
 <Tip>
-You can also remix this agent to customize it for your specific needs. Learn how to create your own remix in our [remix agent documentation](/hub/agents/create-an-agent#how-to-remix-an-agent).
+  You can also remix this config to customize it for your specific needs. Learn how to create your own remix in our [remix config documentation](/hub/configs/create-a-config#how-to-remix-a-config).
 </Tip>
 
 ### Option 2: Create Your Own Custom Agent
@@ -134,8 +134,8 @@ You can also remix this agent to customize it for your specific needs. Learn how
 If you want more control or customization, you can create your own documentation agent:
 
 <Steps>
-  <Step title="Create a new agent">
-    Follow our [agent creation guide](/hub/agents/create-an-agent) to set up your own agent.
+      <Step title="Create a new config">
+          Follow our [config creation guide](/hub/configs/create-a-config) to set up your own config.
   </Step>
   
   <Step title="Add the Continue Docs MCP">
@@ -295,6 +295,35 @@ const example = "Hello, Continue!";
   - Create a pull request to the main repository
   - Allow you to add a title, description, and reference issues
   - Open the PR in your browser if using `--web`
+
+</Tip>
+
+### Linking Your PR to Issues
+
+<Info>
+
+**Important**: When your PR addresses a specific issue, make sure to link it using GitHub keywords.
+
+</Info>
+
+To automatically link your PR to an issue and close it when the PR is merged, use one of these keywords in your PR description:
+
+- `closes #issue_number`
+- `fixes #issue_number`
+- `resolves #issue_number`
+
+**Example PR description:**
+```markdown
+Improved the installation guide with clearer steps for Windows users.
+
+Closes #1234
+```
+
+This helps us track which issues are being worked on and automatically closes them when your PR is merged.
+
+<Tip>
+
+Learn more about linking PRs to issues in the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/using-keywords-in-issues-and-pull-requests).
 
 </Tip>
 

@@ -70,6 +70,7 @@ import {
 import { MCPManagerSingleton } from "./context/mcp/MCPManagerSingleton";
 import { performAuth, removeMCPAuth } from "./context/mcp/MCPOauth";
 import { setMdmLicenseKey } from "./control-plane/mdm/mdm";
+import { myersDiff } from "./diff/myers";
 import { ApplyAbortManager } from "./edit/applyAbortManager";
 import { streamDiffLines } from "./edit/streamDiffLines";
 import { shouldIgnore } from "./indexing/shouldIgnore";
@@ -472,9 +473,11 @@ export class Core {
       const urlPath = msg.data.path.startsWith("/")
         ? msg.data.path.slice(1)
         : msg.data.path;
-      let url = `${env.APP_URL}${urlPath}`;
+      let url;
       if (msg.data.orgSlug) {
-        url += `?org=${msg.data.orgSlug}`;
+        url = `${env.APP_URL}organizations/${msg.data.orgSlug}/${urlPath}`;
+      } else {
+        url = `${env.APP_URL}${urlPath}`;
       }
       await this.messenger.request("openUrl", url);
     });
@@ -483,14 +486,8 @@ export class Core {
       return await getControlPlaneEnv(this.ide.getIdeSettings());
     });
 
-    on("controlPlane/getFreeTrialStatus", async (msg) => {
-      return this.configHandler.controlPlaneClient.getFreeTrialStatus();
-    });
-
-    on("controlPlane/getModelsAddOnUpgradeUrl", async (msg) => {
-      return this.configHandler.controlPlaneClient.getModelsAddOnCheckoutUrl(
-        msg.data.vsCodeUriScheme,
-      );
+    on("controlPlane/getCreditStatus", async (msg) => {
+      return this.configHandler.controlPlaneClient.getCreditStatus();
     });
 
     on("mcp/reloadServer", async (msg) => {
@@ -800,6 +797,10 @@ export class Core {
       );
     });
 
+    on("getDiffLines", (msg) => {
+      return myersDiff(msg.data.oldContent, msg.data.newContent);
+    });
+
     on("cancelApply", async (msg) => {
       const abortManager = ApplyAbortManager.getInstance();
       abortManager.clear(); // for now abort all streams
@@ -887,9 +888,9 @@ export class Core {
         });
       }
 
-      // If it's a local agent being created, we want to reload all agent so it shows up in the list
+      // If it's a local config being created, we want to reload all configs so it shows up in the list
       if (nonColocatedRuleUris.some(isContinueAgentConfigFile)) {
-        await this.configHandler.refreshAll("Local assistant file created");
+        await this.configHandler.refreshAll("Local config file created");
       } else if (nonColocatedRuleUris.some(isContinueConfigRelatedUri)) {
         await this.configHandler.reloadConfig(
           ".continue config-related file created",
@@ -919,9 +920,9 @@ export class Core {
         });
       }
 
-      // If it's a local agent being deleted, we want to reload all agent so it disappears from the list
+      // If it's a local config being deleted, we want to reload all configs so it disappears from the list
       if (nonColocatedRuleUris.some(isContinueAgentConfigFile)) {
-        await this.configHandler.refreshAll("Local assistant file deleted");
+        await this.configHandler.refreshAll("Local config file deleted");
       } else if (nonColocatedRuleUris.some(isContinueConfigRelatedUri)) {
         await this.configHandler.reloadConfig(
           ".continue config-related file deleted",
@@ -1097,7 +1098,7 @@ export class Core {
 
     on(
       "tools/evaluatePolicy",
-      async ({ data: { toolName, basePolicy, args } }) => {
+      async ({ data: { toolName, basePolicy, parsedArgs, processedArgs } }) => {
         const { config } = await this.configHandler.loadConfig();
         if (!config) {
           throw new Error("Config not loaded");
@@ -1110,12 +1111,16 @@ export class Core {
 
         // Extract display value for specific tools
         let displayValue: string | undefined;
-        if (toolName === "runTerminalCommand" && args.command) {
-          displayValue = args.command as string;
+        if (toolName === "runTerminalCommand" && parsedArgs.command) {
+          displayValue = parsedArgs.command as string;
         }
 
         if (tool.evaluateToolCallPolicy) {
-          const evaluatedPolicy = tool.evaluateToolCallPolicy(basePolicy, args);
+          const evaluatedPolicy = tool.evaluateToolCallPolicy(
+            basePolicy,
+            parsedArgs,
+            processedArgs,
+          );
           return { policy: evaluatedPolicy, displayValue };
         }
         return { policy: basePolicy, displayValue };

@@ -84,6 +84,10 @@ export function addCommonOptions(command: Command): Command {
         return array;
       },
       [] as string[],
+    )
+    .option(
+      "--agent <slug>",
+      "Load agent file from the hub (slug in format 'owner/package')",
     );
 }
 
@@ -107,6 +111,7 @@ export function mergeParentOptions(parentCommand: Command, options: any): any {
     "allow",
     "ask",
     "exclude",
+    "agent",
   ];
 
   for (const optName of inheritableOptions) {
