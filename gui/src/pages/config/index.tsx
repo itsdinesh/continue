@@ -2,13 +2,12 @@ import { isOnPremSession } from "core/control-plane/AuthTypes";
 import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AssistantAndOrgListbox } from "../../components/AssistantAndOrgListbox";
-import Alert from "../../components/gui/Alert";
+import { CliInstallBanner } from "../../components/CliInstallBanner";
 import { Divider } from "../../components/ui/Divider";
 import { TabGroup } from "../../components/ui/TabGroup";
 import { useAuth } from "../../context/Auth";
 import { useNavigationListener } from "../../hooks/useNavigationListener";
 import { bottomTabSections, getAllTabs, topTabSections } from "./configTabs";
-import { CliInstallBanner } from "../../components/CliInstallBanner";
 import { AccountDropdown } from "./features/account/AccountDropdown";
 
 function ConfigPage() {
@@ -76,21 +75,8 @@ function ConfigPage() {
 
       {/* Main content area */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {/* Alert for small screens (sm and below) */}
-        <div className="block px-4 py-4 sm:hidden">
-          <Alert type="warning" className="max-w-md">
-            <div className="flex flex-col">
-              <div className="font-medium">Screen width too small</div>
-              <div className="text-description mt-1 text-sm">
-                To view settings, please expand the sidebar by dragging the
-                left/right border
-              </div>
-            </div>
-          </Alert>
-        </div>
-
-        {/* Tab Content for larger screens (md and above) */}
-        <div className="thin-scrollbar relative hidden flex-1 overflow-y-auto sm:block">
+        {/* Tab Content - now visible on all screen sizes */}
+        <div className="thin-scrollbar relative flex-1 overflow-y-auto">
           <div className="space-y-6 px-4 py-4">
             {allTabs.find((tab) => tab.id === activeTab)?.component}
           </div>

@@ -27,20 +27,20 @@ export interface VerticalDiffCodeLens {
 }
 
 export class VerticalDiffManager {
-  public refreshCodeLens: () => void = () => { };
-
-  // Event emitter for immediate CodeLens updates
-  private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
-  public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
+  public refreshCodeLens: (uri?: string) => void = () => { };
+  public setCodeLensState: (uri: string, state: "working" | "streaming" | "applied" | "idle") => void = () => { };
 
   // Generate a simple UUID for diff blocks
   private generateBlockId(): string {
     return 'block-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now().toString(36);
   }
 
-  private forceRefreshCodeLenses() {
-    // Just call the refresh function - VS Code will update when it's ready
-    this.refreshCodeLens();
+  /**
+   * CRITICAL: Force immediate CodeLens refresh for a specific file
+   * This is called after any state change to ensure UI updates instantly
+   */
+  private forceRefreshCodeLenses(uri?: string) {
+    this.refreshCodeLens(uri);
   }
 
   private fileUriToHandler: Map<string, VerticalDiffHandler> = new Map();
@@ -176,8 +176,8 @@ export class VerticalDiffManager {
       undefined,
     );
 
-    // Force immediate CodeLens refresh to ensure Accept All/Edit & Retry/Reject All buttons disappear
-    this.forceRefreshCodeLenses();
+    // CRITICAL: Force immediate CodeLens refresh with file URI for instant update
+    this.forceRefreshCodeLenses(fileUri);
   }
 
   async acceptRejectVerticalDiffBlock(
@@ -228,8 +228,8 @@ export class VerticalDiffManager {
       this.fileUriToOriginalCursorPosition.delete(fileUri);
     }
 
-    // Force CodeLens refresh - VS Code will update when it's ready
-    this.refreshCodeLens();
+    // CRITICAL: Force immediate CodeLens refresh with file URI
+    this.forceRefreshCodeLenses(fileUri);
 
     // Disable listening to file changes while continue makes changes
     this.disableDocumentChangeListener();
@@ -261,6 +261,9 @@ export class VerticalDiffManager {
         // Update with corrected positions
         this.fileUriToCodeLens.set(fileUri, updatedBlocks);
 
+        // CRITICAL: Refresh CodeLens immediately after position update
+        this.forceRefreshCodeLenses(fileUri);
+
         // Re-enable listener for user changes to file
         this.enableDocumentChangeListener();
 
@@ -278,8 +281,8 @@ export class VerticalDiffManager {
       console.error("Error in acceptRejectVerticalDiffBlock:", error);
       // Re-enable listener even if there was an error
       this.enableDocumentChangeListener();
-      // Refresh to ensure consistent state
-      this.refreshCodeLens();
+      // CRITICAL: Refresh to ensure consistent state
+      this.forceRefreshCodeLenses(fileUri);
     }
   }
 
@@ -349,8 +352,16 @@ export class VerticalDiffManager {
       true,
     );
 
+    // CRITICAL: Set streaming state
+    this.setCodeLensState(fileUri, "streaming");
+    this.forceRefreshCodeLenses(fileUri);
+
     try {
       this.logDiffs = await diffHandler.run(diffStream);
+
+      // CRITICAL: Set applied state after streaming completes
+      this.setCodeLensState(fileUri, "applied");
+      this.forceRefreshCodeLenses(fileUri);
 
       // enable a listener for user edits to file while diff is open
       this.enableDocumentChangeListener();
@@ -469,6 +480,10 @@ export class VerticalDiffManager {
 
     // Store the original cursor position (start of selection) before the diff starts
     this.fileUriToOriginalCursorPosition.set(fileUri, editor.selection.start);
+
+    // CRITICAL: Set working state to show "Continue is working..." lens
+    this.setCodeLensState(fileUri, "working");
+    this.forceRefreshCodeLenses(fileUri);
 
     let startLine, endLine: number;
 
@@ -607,6 +622,10 @@ export class VerticalDiffManager {
       true,
     );
 
+    // CRITICAL: Set streaming state to show "Streaming edits..." lens
+    this.setCodeLensState(fileUri, "streaming");
+    this.forceRefreshCodeLenses(fileUri);
+
     this.editDecorationManager.clear();
 
     const abortManager = ApplyAbortManager.getInstance();
@@ -659,6 +678,10 @@ export class VerticalDiffManager {
       }
 
       this.logDiffs = await diffHandler.run(recordedStream());
+
+      // CRITICAL: Set applied state to show accept/reject lenses
+      this.setCodeLensState(fileUri, "applied");
+      this.forceRefreshCodeLenses(fileUri);
 
       // enable a listener for user edits to file while diff is open
       this.enableDocumentChangeListener();

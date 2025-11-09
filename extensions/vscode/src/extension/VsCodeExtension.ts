@@ -26,7 +26,7 @@ import { registerAllCommands } from "../commands";
 import { ContinueConsoleWebviewViewProvider } from "../ContinueConsoleWebviewViewProvider";
 import { ContinueGUIWebviewViewProvider } from "../ContinueGUIWebviewViewProvider";
 import { VerticalDiffManager } from "../diff/vertical/manager";
-import { registerAllCodeLensProviders } from "../lang-server/codeLens";
+import { DiffState, registerAllCodeLensProviders } from "../lang-server/codeLens";
 import { registerAllPromptFilesCompletionProviders } from "../lang-server/promptFileCompletions";
 import EditDecorationManager from "../quickEdit/EditDecorationManager";
 import { QuickEdit } from "../quickEdit/QuickEditQuickPick";
@@ -320,6 +320,15 @@ export class VsCodeExtension {
 
       this.verticalDiffManager.refreshCodeLens =
         verticalDiffCodeLens.refresh.bind(verticalDiffCodeLens);
+      this.verticalDiffManager.setCodeLensState = (uri: string, state: "working" | "streaming" | "applied" | "idle") => {
+        const stateMap: Record<string, DiffState> = {
+          working: DiffState.Working,
+          streaming: DiffState.Streaming,
+          applied: DiffState.Applied,
+          idle: DiffState.Idle,
+        };
+        verticalDiffCodeLens.setState(uri, stateMap[state]);
+      };
     });
 
     this.configHandler.onConfigUpdate(
@@ -336,12 +345,25 @@ export class VsCodeExtension {
         } else if (newConfig) {
           setupStatusBar(undefined, undefined, false);
 
-          registerAllCodeLensProviders(
+          const { verticalDiffCodeLens } = registerAllCodeLensProviders(
             context,
             this.verticalDiffManager.fileUriToCodeLens,
             newConfig,
             this.verticalDiffManager.fileUriToOriginalCursorPosition,
           );
+
+          // Re-wire the methods after config update
+          this.verticalDiffManager.refreshCodeLens =
+            verticalDiffCodeLens.refresh.bind(verticalDiffCodeLens);
+          this.verticalDiffManager.setCodeLensState = (uri: string, state: "working" | "streaming" | "applied" | "idle") => {
+            const stateMap: Record<string, DiffState> = {
+              working: DiffState.Working,
+              streaming: DiffState.Streaming,
+              applied: DiffState.Applied,
+              idle: DiffState.Idle,
+            };
+            verticalDiffCodeLens.setState(uri, stateMap[state]);
+          };
         }
       },
     );

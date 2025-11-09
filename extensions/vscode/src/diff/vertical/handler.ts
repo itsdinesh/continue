@@ -48,7 +48,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
       fileUri: string | undefined,
       accept: boolean,
     ) => void,
-    private readonly refreshCodeLens: () => void,
+    private readonly refreshCodeLens: (uri?: string) => void,
     public options: VerticalDiffHandlerOptions,
     private readonly generateBlockId: () => string,
   ) {
@@ -68,7 +68,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
         this.removedLineDecorations.applyToNewEditor(editor);
         this.addedLineDecorations.applyToNewEditor(editor);
         this.updateIndexLineDecorations();
-        this.refreshCodeLens();
+        this.refreshCodeLens(this.fileUri);
 
         // Handle any lines received while editor was closed
         this.queueDiffLine(undefined);
@@ -148,7 +148,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
     );
 
     this.cancelled = true;
-    this.refreshCodeLens();
+    this.refreshCodeLens(this.fileUri);
     this.dispose();
   }
 
@@ -312,7 +312,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
     this.addedLineDecorations.clear();
     this.clearIndexLineDecorations();
     this.editorToVerticalDiffCodeLens.delete(this.fileUri);
-    this.refreshCodeLens();
+    this.refreshCodeLens(this.fileUri);
   }
 
   /**
@@ -413,7 +413,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
     }
 
     this.editorToVerticalDiffCodeLens.set(this.fileUri, codeLensBlocks);
-    this.refreshCodeLens();
+    this.refreshCodeLens(this.fileUri);
 
     return myersDiffs;
   }
@@ -461,7 +461,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
 
     this.deletionBuffer = [];
     this.insertedInCurrentBlock = 0;
-    this.refreshCodeLens();
+    this.refreshCodeLens(this.fileUri);
   }
 
   private incrementCurrentLineIndex() {
@@ -608,7 +608,7 @@ export class VerticalDiffHandler implements vscode.Disposable {
         }) || [];
     this.editorToVerticalDiffCodeLens.set(this.fileUri, blocks);
 
-    this.refreshCodeLens();
+    this.refreshCodeLens(this.fileUri);
   }
 
   /**

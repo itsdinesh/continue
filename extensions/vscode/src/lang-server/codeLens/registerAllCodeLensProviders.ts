@@ -109,7 +109,7 @@ export function registerAllCodeLensProviders(
     downloadYamlExtensionCodeLensDisposable.dispose();
   }
 
-  const verticalDiffCodeLens = new providers.VerticalPerLineCodeLensProvider(
+  const verticalDiffCodeLens = new providers.FastVerticalDiffCodeLensProvider(
     editorToVerticalDiffCodeLens,
     fileUriToOriginalCursorPosition || new Map(),
   );
