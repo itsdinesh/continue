@@ -34,6 +34,8 @@ export const runTerminalCommandTool: Tool = {
   description: `Executes a terminal command and returns the output
 
 Commands are automatically executed from the current working directory (${process.cwd()}), so there's no need to change directories with 'cd' commands.
+
+IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed, awk, etc).
 `,
   parameters: {
     type: "object",
@@ -42,6 +44,11 @@ Commands are automatically executed from the current working directory (${proces
       command: {
         type: "string",
         description: "The command to execute in the terminal.",
+      },
+      timeout: {
+        type: "number",
+        description:
+          "Optional timeout in seconds (max 600). Use this parameter for commands that take longer than the default 180 second timeout.",
       },
     },
   },
@@ -73,7 +80,13 @@ Commands are automatically executed from the current working directory (${proces
       ],
     };
   },
-  run: async ({ command }: { command: string }): Promise<string> => {
+  run: async ({
+    command,
+    timeout,
+  }: {
+    command: string;
+    timeout?: number;
+  }): Promise<string> => {
     return new Promise((resolve, reject) => {
       // Use same shell logic as core implementation
       const { shell, args } = getShellCommand(command);
@@ -83,10 +96,18 @@ Commands are automatically executed from the current working directory (${proces
       let timeoutId: NodeJS.Timeout;
       let isResolved = false;
 
-      const TIMEOUT_MS =
-        process.env.NODE_ENV === "test" && process.env.TEST_TERMINAL_TIMEOUT
-          ? parseInt(process.env.TEST_TERMINAL_TIMEOUT, 10)
-          : 30000; // 30 seconds default, configurable for tests
+      // Determine timeout: use provided timeout (capped at 600s), test env variable, or default 120s
+      let TIMEOUT_MS = 180000; // 180 seconds default
+      if (timeout !== undefined) {
+        // Cap at 600 seconds (10 minutes)
+        const cappedTimeout = Math.min(timeout, 600);
+        TIMEOUT_MS = cappedTimeout * 1000;
+      } else if (
+        process.env.NODE_ENV === "test" &&
+        process.env.TEST_TERMINAL_TIMEOUT
+      ) {
+        TIMEOUT_MS = parseInt(process.env.TEST_TERMINAL_TIMEOUT, 10);
+      }
 
       const resetTimeout = () => {
         if (timeoutId) {

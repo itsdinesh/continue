@@ -31,13 +31,20 @@
 
 </div>
 
-Get started in [Mission Control](https://hub.continue.dev/agents), [CLI (Headless Mode)](https://docs.continue.dev/cli/quick-start#headless-mode), or [CLI (TUI mode)](https://docs.continue.dev/cli/quick-start#tui-mode)
+Get started in [Mission Control](https://hub.continue.dev/hub?type=agents), [CLI (Headless Mode)](https://docs.continue.dev/cli/quick-start#headless-mode), or [CLI (TUI mode)](https://docs.continue.dev/cli/quick-start#tui-mode)
 
-## Background Agents
+### Quick Install
+
+```bash
+npm i -g @continuedev/cli
+cn
+```
+
+## Cloud Agents
 
 Set workflows to run automatically on [PR opens](https://docs.continue.dev/guides/continuous-ai#pattern-2-the-pr-review-agent), [schedules](https://docs.continue.dev/guides/continuous-ai#pattern-1-the-async-triage-bot), or [any event trigger](https://docs.continue.dev/cli/quick-start#headless-mode)
 
-![Background Agents](docs/images/background-agent.gif)
+![Cloud Agents](docs/images/background-agent.gif)
 
 ## CLI Agents
 

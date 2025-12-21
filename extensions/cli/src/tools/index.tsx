@@ -25,9 +25,10 @@ import { fetchTool } from "./fetch.js";
 import { listFilesTool } from "./listFiles.js";
 import { multiEditTool } from "./multiEdit.js";
 import { readFileTool } from "./readFile.js";
+import { reportFailureTool } from "./reportFailure.js";
 import { runTerminalCommandTool } from "./runTerminalCommand.js";
-import { searchCodeTool } from "./searchCode.js";
-import { statusTool } from "./status.js";
+import { checkIfRipgrepIsInstalled, searchCodeTool } from "./searchCode.js";
+import { isBetaUploadArtifactToolEnabled } from "./toolsConfig.js";
 import {
   type Tool,
   type ToolCall,
@@ -35,27 +36,58 @@ import {
   ParameterSchema,
   PreprocessedToolCall,
 } from "./types.js";
+import { uploadArtifactTool } from "./uploadArtifact.js";
 import { writeChecklistTool } from "./writeChecklist.js";
 import { writeFileTool } from "./writeFile.js";
 
 export type { Tool, ToolCall, ToolParametersSchema };
+
+/**
+ * Extract the agent ID from the --id command line flag
+ */
+function getAgentIdFromArgs(): string | undefined {
+  const args = process.argv;
+  const idIndex = args.indexOf("--id");
+  if (idIndex !== -1 && idIndex + 1 < args.length) {
+    return args[idIndex + 1];
+  }
+  return undefined;
+}
 
 // Base tools that are always available
 const BASE_BUILTIN_TOOLS: Tool[] = [
   readFileTool,
   writeFileTool,
   listFilesTool,
-  searchCodeTool,
   runTerminalCommandTool,
   fetchTool,
   writeChecklistTool,
 ];
+
+const BUILTIN_SEARCH_TOOLS: Tool[] = [searchCodeTool];
 
 // Get all builtin tools including dynamic ones, with capability-based filtering
 export async function getAllAvailableTools(
   isHeadless: boolean,
 ): Promise<Tool[]> {
   const tools = [...BASE_BUILTIN_TOOLS];
+
+  const isRipgrepInstalled = await checkIfRipgrepIsInstalled();
+  if (isRipgrepInstalled) {
+    tools.push(...BUILTIN_SEARCH_TOOLS);
+  }
+
+  // Add agent-specific tools if agent ID is present
+  // (these require --id to function and will confuse the agent if unavailable)
+  const agentId = getAgentIdFromArgs();
+  if (agentId) {
+    tools.push(reportFailureTool);
+
+    // UploadArtifact tool is gated behind beta flag
+    if (isBetaUploadArtifactToolEnabled()) {
+      tools.push(uploadArtifactTool);
+    }
+  }
 
   // If model is capable, exclude editTool in favor of multiEditTool
   const modelState = await serviceContainer.get<ModelServiceState>(
@@ -85,11 +117,6 @@ export async function getAllAvailableTools(
 
   if (isHeadless) {
     tools.push(exitTool);
-  }
-
-  // Add beta status tool if --beta-status-tool flag is present
-  if (process.argv.includes("--beta-status-tool")) {
-    tools.push(statusTool);
   }
 
   const mcpState = await serviceContainer.get<MCPServiceState>(
@@ -180,12 +207,18 @@ export async function executeToolCall(
       arguments: toolCall.arguments,
     });
 
+    // Track edits if Git AI is enabled (no-op if not enabled)
+    await services.gitAiIntegration.trackToolUse(toolCall, "PreToolUse");
+
     // IMPORTANT: if preprocessed args are present, uses preprocessed args instead of original args
     // Preprocessed arg names may be different
     const result = await toolCall.tool.run(
       toolCall.preprocessResult?.args ?? toolCall.arguments,
     );
     const duration = Date.now() - startTime;
+
+    // Track edits if Git AI is enabled (no-op if not enabled)
+    await services.gitAiIntegration.trackToolUse(toolCall, "PostToolUse");
 
     telemetryService.logToolResult({
       toolName: toolCall.name,
