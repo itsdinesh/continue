@@ -550,10 +550,20 @@ export async function unrollBlocks(
         const injectedBlockPromises = injectBlocks.map(async (injectBlock) => {
           try {
             const blockConfigYaml = await registry.getContent(injectBlock);
+            // Convert inputs to secrets, then convert secrets to FQSNs using the injected block's identifier
+            // This ensures secrets are properly namespaced for proxy resolution (e.g., models add-on)
             const blockConfigYamlWithSecrets =
               replaceInputsWithSecrets(blockConfigYaml);
-            const resolvedBlock = parseMarkdownRuleOrConfigYaml(
+            const blockConfigYamlWithFQSNs = renderTemplateData(
               blockConfigYamlWithSecrets,
+              {
+                secrets: extractFQSNMap(blockConfigYamlWithSecrets, [
+                  injectBlock,
+                ]),
+              },
+            );
+            const resolvedBlock = parseMarkdownRuleOrConfigYaml(
+              blockConfigYamlWithFQSNs,
               injectBlock,
             );
             const blockType = getBlockType(resolvedBlock);
@@ -729,6 +739,21 @@ export async function resolveBlock(
     inputs: renderedInputs,
     secrets: extractFQSNMap(rawYaml, [id]),
   });
+
+  // Check for unresolved input template variables (missing required inputs)
+  const unresolvedInputs = getTemplateVariables(templatedYaml).filter((v) =>
+    v.startsWith("inputs."),
+  );
+  if (unresolvedInputs.length > 0) {
+    const missingInputNames = unresolvedInputs.map((v) =>
+      v.replace("inputs.", ""),
+    );
+    const blockName = packageIdentifierToShorthandSlug(id);
+    throw new Error(
+      `Missing required input(s) for block "${blockName}": ${missingInputNames.join(", ")}. ` +
+        `Please provide these values in the "with" block.`,
+    );
+  }
 
   // Add source slug for mcp servers
   const parsed = parseMarkdownRuleOrAssistantUnrolled(templatedYaml, id);

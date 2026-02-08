@@ -6,6 +6,7 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import Text from "@tiptap/extension-text";
 import { Plugin } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { useEditor } from "@tiptap/react";
 import { InputModifiers } from "core";
 import { modelSupportsImages } from "core/llm/autodetect";
@@ -55,11 +56,22 @@ export function hasValidEditorContent(json: JSONContent): boolean {
     (c) => c.type === PromptBlock.name || c.type === CodeBlock.name,
   );
 
-  // Check for text content
-  const hasTextContent = json.content?.some((c) => c.content);
+  // Check for non-whitespace text content
+  const hasNonWhitespaceText = json.content?.some((c) =>
+    c.content?.some((child) => {
+      if (child.type === "text" && child.text) {
+        return child.text.trim().length > 0;
+      }
+      // Mentions and other non-text nodes are valid content
+      if (child.type === "mention") {
+        return true;
+      }
+      return false;
+    }),
+  );
 
-  // Content is valid if it has either text or special blocks
-  return hasTextContent || hasPromptOrCodeBlock || false;
+  // Content is valid if it has either non-whitespace text or special blocks
+  return hasNonWhitespaceText || hasPromptOrCodeBlock || false;
 }
 
 /**
@@ -144,7 +156,7 @@ export function createEditorConfig(options: {
       History,
       Image.extend({
         addProseMirrorPlugins() {
-          const plugin = new Plugin({
+          const pastePlugin = new Plugin({
             props: {
               handleDOMEvents: {
                 paste(view, event) {
@@ -179,7 +191,34 @@ export function createEditorConfig(options: {
               },
             },
           });
-          return [plugin];
+
+          const selectionPlugin = new Plugin({
+            props: {
+              decorations(state) {
+                const { selection, doc } = state;
+                const decorations: Decoration[] = [];
+
+                if (selection.empty) {
+                  return DecorationSet.empty;
+                }
+
+                // create custom highlighting for image when selected
+                doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+                  if (node.type.name === "image") {
+                    decorations.push(
+                      Decoration.node(pos, pos + node.nodeSize, {
+                        class: "selected-image",
+                      }),
+                    );
+                  }
+                });
+
+                return DecorationSet.create(doc, decorations);
+              },
+            },
+          });
+
+          return [pastePlugin, selectionPlugin];
         },
       }).configure({
         HTMLAttributes: {
@@ -243,6 +282,15 @@ export function createEditorConfig(options: {
                 () => commands.liftEmptyBlock(),
                 () => commands.splitBlock(),
               ]),
+
+            "Mod-a": () => {
+              // override cmd/ctrl+a to include all text and images selection
+              this.editor.commands.setTextSelection({
+                from: 0,
+                to: this.editor.state.doc.content.size,
+              });
+              return true;
+            },
 
             ArrowUp: () => {
               if (this.editor.state.selection.anchor > 1) {

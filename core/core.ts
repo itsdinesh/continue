@@ -414,6 +414,7 @@ export class Core {
         msg.data.blockType,
         msg.data.baseFilename,
       );
+      walkDirCache.invalidate();
       await this.configHandler.reloadConfig(
         "Local block created (config/addLocalWorkspaceBlock message)",
       );
@@ -422,10 +423,34 @@ export class Core {
     on("config/addGlobalRule", async (msg) => {
       try {
         await createNewGlobalRuleFile(this.ide, msg.data?.baseFilename);
+        walkDirCache.invalidate();
         await this.configHandler.reloadConfig(
           "Global rule created (config/addGlobalRule message)",
         );
       } catch (error) {
+        throw error;
+      }
+    });
+
+    on("config/deleteRule", async (msg) => {
+      try {
+        const filepath = msg.data.filepath;
+        if (
+          !isColocatedRulesFile(filepath) &&
+          !isContinueConfigRelatedUri(filepath)
+        ) {
+          throw new Error("Only rule files can be deleted");
+        }
+        const fileExists = await this.ide.fileExists(filepath);
+        if (fileExists) {
+          await this.ide.removeFile(filepath);
+          walkDirCache.invalidate();
+          await this.configHandler.reloadConfig(
+            "Rule file deleted (config/deleteRule message)",
+          );
+        }
+      } catch (error) {
+        console.error("Failed to delete rule file:", error);
         throw error;
       }
     });

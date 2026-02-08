@@ -1,13 +1,17 @@
 import { ModelConfig } from "@continuedev/config-yaml";
 import { BaseLlmApi } from "@continuedev/openai-adapters";
 import type { ChatHistoryItem } from "core/index.js";
+import type { ChatCompletionTool } from "openai/resources/chat/completions.mjs";
 import React from "react";
 
-import { compactChatHistory } from "../compaction.js";
+import {
+  compactChatHistory,
+  getAutoCompactMessage,
+  shouldAutoCompact,
+} from "../compaction.js";
 import { updateSessionHistory } from "../session.js";
 import { formatError } from "../util/formatError.js";
 import { logger } from "../util/logger.js";
-import { getAutoCompactMessage, shouldAutoCompact } from "../util/tokenizer.js";
 
 interface AutoCompactionCallbacks {
   // For streaming mode
@@ -27,6 +31,7 @@ interface AutoCompactionOptions {
   format?: "json";
   callbacks?: AutoCompactionCallbacks;
   systemMessage?: string;
+  tools?: ChatCompletionTool[];
 }
 
 /**
@@ -133,9 +138,18 @@ export async function handleAutoCompaction(
     isHeadless = false,
     callbacks,
     systemMessage: providedSystemMessage,
+    tools,
   } = options;
 
-  if (!model || !shouldAutoCompact(chatHistory, model)) {
+  if (
+    !model ||
+    !shouldAutoCompact({
+      chatHistory,
+      model,
+      systemMessage: providedSystemMessage,
+      tools,
+    })
+  ) {
     return { chatHistory, compactionIndex: null, wasCompacted: false };
   }
 
@@ -161,13 +175,16 @@ export async function handleAutoCompaction(
       typeof systemMessage === "string" ? systemMessage : await systemMessage;
 
     const { countChatHistoryItemTokens } = await import("../util/tokenizer.js");
-    const systemMessageTokens = countChatHistoryItemTokens({
-      message: {
-        role: "system",
-        content: resolvedSystemMessage,
+    const systemMessageTokens = countChatHistoryItemTokens(
+      {
+        message: {
+          role: "system",
+          content: resolvedSystemMessage,
+        },
+        contextItems: [],
       },
-      contextItems: [],
-    });
+      model,
+    );
 
     // Compact the history
     const result = await compactChatHistory(chatHistory, model, llmApi, {

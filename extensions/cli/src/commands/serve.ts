@@ -40,6 +40,8 @@ import { readStdinSync } from "../util/stdin.js";
 
 import { ExtendedCommandOptions } from "./BaseCommandOptions.js";
 import {
+  checkAgentComplete,
+  removePartialAssistantMessage,
   streamChatResponseWithInterruption,
   type ServerState,
 } from "./serve.helpers.js";
@@ -387,10 +389,10 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
       server.close(async () => {
         telemetryService.stopActiveTime();
 
-        // Update metadata one final time before exiting
+        // Update metadata one final time before exiting (with completion flag)
         try {
           const history = services.chatHistory?.getHistory();
-          await updateAgentMetadata(history);
+          await updateAgentMetadata({ history, isComplete: true });
         } catch (err) {
           logger.debug("Failed to update metadata (non-critical)", err as any);
         }
@@ -464,28 +466,6 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     }
   });
 
-  // Process messages from the queue
-  function removePartialAssistantMessage(state: ServerState) {
-    try {
-      const svcHistory = services.chatHistory.getHistory();
-      const last = svcHistory[svcHistory.length - 1];
-      if (last && last.message.role === "assistant" && !last.message.content) {
-        const trimmed = svcHistory.slice(0, -1);
-        services.chatHistory.setHistory(trimmed);
-      }
-    } catch {
-      const lastMessage =
-        state.session.history[state.session.history.length - 1];
-      if (
-        lastMessage &&
-        lastMessage.message.role === "assistant" &&
-        !lastMessage.message.content
-      ) {
-        state.session.history.pop();
-      }
-    }
-  }
-
   async function processMessages(state: ServerState, llmApi: any) {
     let processedMessage = false;
     while (state.serverRunning) {
@@ -529,9 +509,11 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
         // Update metadata after successful agent turn
         try {
           const history = services.chatHistory?.getHistory();
-          await updateAgentMetadata(history);
+          await updateAgentMetadata({
+            history,
+            isComplete: checkAgentComplete(history),
+          });
         } catch (metadataErr) {
-          // Non-critical: log but don't fail the agent execution
           logger.debug(
             "Failed to update metadata after turn (non-critical)",
             metadataErr as any,
@@ -540,8 +522,7 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
       } catch (e: any) {
         if (e.name === "AbortError") {
           logger.debug("Response interrupted");
-          // Remove any partial assistant message
-          removePartialAssistantMessage(state);
+          removePartialAssistantMessage(state.session.history);
         } else {
           logger.error(`Error: ${formatError(e)}`);
 
@@ -596,10 +577,10 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
       server.close(async () => {
         telemetryService.stopActiveTime();
 
-        // Update metadata one final time before exiting
+        // Update metadata one final time before exiting (with completion flag)
         try {
           const history = services.chatHistory?.getHistory();
-          await updateAgentMetadata(history);
+          await updateAgentMetadata({ history, isComplete: true });
         } catch (err) {
           logger.debug("Failed to update metadata (non-critical)", err as any);
         }
@@ -628,10 +609,10 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     server.close(async () => {
       telemetryService.stopActiveTime();
 
-      // Update metadata one final time before exiting
+      // Update metadata one final time before exiting (with completion flag)
       try {
         const history = services.chatHistory?.getHistory();
-        await updateAgentMetadata(history);
+        await updateAgentMetadata({ history, isComplete: true });
       } catch (err) {
         logger.debug("Failed to update metadata (non-critical)", err as any);
       }
@@ -643,7 +624,3 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     });
   });
 }
-
-// Function moved to serve.helpers.ts - remove implementation
-// async function streamChatResponseWithInterruption - moved to helpers {
-// Implementation moved to serve.helpers.ts

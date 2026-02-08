@@ -6,11 +6,13 @@ import "./init.js";
 import { Command } from "commander";
 
 import { chat } from "./commands/chat.js";
+import { checks } from "./commands/checks.js";
 import { login } from "./commands/login.js";
 import { logout } from "./commands/logout.js";
 import { listSessionsCommand } from "./commands/ls.js";
 import { remoteTest } from "./commands/remote-test.js";
 import { remote } from "./commands/remote.js";
+import { review } from "./commands/review.js";
 import { serve } from "./commands/serve.js";
 import {
   handleValidationErrors,
@@ -21,6 +23,7 @@ import { sentryService } from "./sentry.js";
 import { addCommonOptions, mergeParentOptions } from "./shared-options.js";
 import { posthogService } from "./telemetry/posthogService.js";
 import { post } from "./util/apiClient.js";
+import { markUnhandledError } from "./util/errorState.js";
 import { gracefulExit } from "./util/exit.js";
 import { logger } from "./util/logger.js";
 import { readStdinSync } from "./util/stdin.js";
@@ -121,6 +124,9 @@ async function reportUnhandledErrorToApi(error: Error): Promise<void> {
 
 // Add global error handlers to prevent uncaught errors from crashing the process
 process.on("unhandledRejection", (reason, promise) => {
+  // Mark that an unhandled error occurred - this will cause non-zero exit
+  markUnhandledError();
+
   // Extract useful information from the reason
   const errorDetails = {
     promiseString: String(promise),
@@ -149,17 +155,20 @@ process.on("unhandledRejection", (reason, promise) => {
   }
 
   // Note: Sentry capture is handled by logger.error() above
-  // Don't exit the process, just log the error
+  // Don't exit the process immediately, but hasUnhandledError will cause non-zero exit later
 });
 
 process.on("uncaughtException", (error) => {
+  // Mark that an unhandled error occurred - this will cause non-zero exit
+  markUnhandledError();
+
   logger.error("Uncaught Exception:", error);
   // Report to API if running in serve mode
   reportUnhandledErrorToApi(error).catch(() => {
     // Silently fail if API reporting errors - already logged in helper
   });
   // Note: Sentry capture is handled by logger.error() above
-  // Don't exit the process, just log the error
+  // Don't exit the process immediately, but hasUnhandledError will cause non-zero exit later
 });
 
 // keyboard interruption handler for non-TUI flows
@@ -191,6 +200,10 @@ addCommonOptions(program)
   )
   .option("--resume", "Resume from last session")
   .option("--fork <sessionId>", "Fork from an existing session ID")
+  .option(
+    "--beta-subagent-tool",
+    "Enable beta Subagent tool for invoking subagents",
+  )
   .action(async (prompt, options) => {
     // Telemetry: record command invocation
     await posthogService.capture("cliCommand", { command: "cn" });
@@ -408,6 +421,31 @@ program
     await remoteTest(prompt, options.url);
   });
 
+// Checks subcommand
+program
+  .command("checks [action] [pr-url]")
+  .description("Show CI check statuses for a PR")
+  .action(async (action: string | undefined, prUrl: string | undefined) => {
+    await posthogService.capture("cliCommand", { command: "checks" });
+    await checks(action, prUrl);
+  });
+
+// Review subcommand
+program
+  .command("review")
+  .description("Run AI-powered reviews on your changes")
+  .option("--base <ref>", "Base git ref to diff against (default: auto-detect)")
+  .option("--format <format>", "Output format")
+  .option("--fix", "Automatically apply suggested fixes")
+  .option("--patch", "Show patches")
+  .option("--fail-fast", "Stop on first failure")
+  .option("--review-agents <agents...>", "Specific review agents to run")
+  .option("--verbose", "Enable verbose logging")
+  .action(async (options) => {
+    await posthogService.capture("cliCommand", { command: "review" });
+    await review(options);
+  });
+
 // Handle unknown commands
 program.on("command:*", () => {
   console.error(`Error: Unknown command '${program.args.join(" ")}'\n`);
@@ -416,6 +454,15 @@ program.on("command:*", () => {
 });
 
 export async function runCli(): Promise<void> {
+  // Handle internal worker subprocess for cn review
+  if (process.argv.includes("--internal-review-worker")) {
+    const { runReviewWorker } = await import(
+      "./commands/review/reviewWorker.js"
+    );
+    await runReviewWorker();
+    return;
+  }
+
   // Parse arguments and handle errors
   try {
     program.parse();

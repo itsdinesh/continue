@@ -12,6 +12,7 @@ import { pruneLastMessage } from "../compaction.js";
 import { services } from "../services/index.js";
 import { posthogService } from "../telemetry/posthogService.js";
 import { telemetryService } from "../telemetry/telemetryService.js";
+import { applyChatCompletionToolOverrides } from "../tools/applyToolOverrides.js";
 import { ToolCall } from "../tools/index.js";
 import {
   chatCompletionStreamWithBackoff,
@@ -215,25 +216,17 @@ export async function processStreamingResponse(
 
   let chatHistory = options.chatHistory;
 
-  // Create temporary system message item for validation
-  const systemMessageItem: ChatHistoryItem = {
-    message: {
-      role: "system",
-      content: systemMessage,
-    },
-    contextItems: [],
-  };
-
   // Safety buffer to account for tokenization estimation errors
   const SAFETY_BUFFER = 100;
 
-  // Validate context length INCLUDING system message
-  let historyWithSystem = [systemMessageItem, ...chatHistory];
-  let validation = validateContextLength(
-    historyWithSystem,
+  // Validate context length INCLUDING system message and tools
+  let validation = validateContextLength({
+    chatHistory,
     model,
-    SAFETY_BUFFER,
-  );
+    safetyBuffer: SAFETY_BUFFER,
+    systemMessage,
+    tools,
+  });
 
   // Prune last messages until valid (excluding system message)
   while (chatHistory.length > 1 && !validation.isValid) {
@@ -243,9 +236,14 @@ export async function processStreamingResponse(
     }
     chatHistory = prunedChatHistory;
 
-    // Re-validate with system message
-    historyWithSystem = [systemMessageItem, ...chatHistory];
-    validation = validateContextLength(historyWithSystem, model, SAFETY_BUFFER);
+    // Re-validate with system message and tools
+    validation = validateContextLength({
+      chatHistory,
+      model,
+      safetyBuffer: SAFETY_BUFFER,
+      systemMessage,
+      tools,
+    });
   }
 
   if (!validation.isValid) {
@@ -457,14 +455,19 @@ export async function streamChatResponse(
     chatHistory = refreshChatHistoryFromService(chatHistory, isCompacting);
     logger.debug("Starting conversation iteration");
 
-    logger.debug("debug1 streamChatResponse history", { chatHistory });
-
     // Get system message once per iteration (can change based on tool permissions mode)
     const systemMessage = await services.systemMessage.getSystemMessage(
       services.toolPermissions.getState().currentMode,
     );
 
-    // Pre-API auto-compaction checkpoint
+    // Recompute tools on each iteration to handle mode changes during streaming
+    const rawTools = await getRequestTools(isHeadless);
+    const tools = applyChatCompletionToolOverrides(
+      rawTools,
+      model.chatOptions?.toolOverrides,
+    );
+
+    // Pre-API auto-compaction checkpoint (now includes tools)
     const preCompactionResult = await handlePreApiCompaction(chatHistory, {
       model,
       llmApi,
@@ -472,14 +475,12 @@ export async function streamChatResponse(
       isHeadless,
       callbacks,
       systemMessage,
+      tools,
     });
     chatHistory = preCompactionResult.chatHistory;
     if (preCompactionResult.wasCompacted) {
       compactionOccurredThisTurn = true;
     }
-
-    // Recompute tools on each iteration to handle mode changes during streaming
-    const tools = await getRequestTools(isHeadless);
 
     logger.debug("Tools prepared", {
       toolCount: tools.length,
@@ -541,6 +542,7 @@ export async function streamChatResponse(
         isHeadless,
         callbacks,
         systemMessage,
+        tools,
       },
     );
     chatHistory = postToolResult.chatHistory;
@@ -559,6 +561,7 @@ export async function streamChatResponse(
         isHeadless,
         callbacks,
         systemMessage,
+        tools,
       },
     );
     chatHistory = compactionResult.chatHistory;

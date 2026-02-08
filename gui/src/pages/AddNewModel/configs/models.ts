@@ -37,6 +37,76 @@ export interface ModelPackage {
 }
 
 export const models: { [key: string]: ModelPackage } = {
+  hermes3Llama31_405b: {
+    title: "Hermes 3 Llama 3.1 405B",
+    description:
+      "Nous Research's Hermes 3, a powerful instruction-tuned model built on Llama 3.1 405B with strong reasoning and tool use capabilities.",
+    refUrl: "https://nousresearch.com/hermes3",
+    params: {
+      title: "Hermes 3 Llama 3.1 405B",
+      model: "Hermes-3-Llama-3.1-405B",
+      contextLength: 32_000,
+    },
+    icon: "nous.png",
+    providerOptions: ["nous"],
+    isOpenSource: true,
+  },
+  hermes3Llama31_70b: {
+    title: "Hermes 3 Llama 3.1 70B",
+    description:
+      "Nous Research's Hermes 3, built on Llama 3.1 70B with strong instruction following and reasoning.",
+    refUrl: "https://nousresearch.com/hermes3",
+    params: {
+      title: "Hermes 3 Llama 3.1 70B",
+      model: "Hermes-3-Llama-3.1-70B",
+      contextLength: 32_000,
+    },
+    icon: "nous.png",
+    providerOptions: ["nous"],
+    isOpenSource: true,
+  },
+  hermes4_405b: {
+    title: "Hermes 4 405B",
+    description:
+      "Nous Research's Hermes 4, featuring enhanced reasoning with thinking tags for chain-of-thought.",
+    refUrl: "https://nousresearch.com",
+    params: {
+      title: "Hermes 4 405B",
+      model: "Hermes-4-405B",
+      contextLength: 128_000,
+    },
+    icon: "nous.png",
+    providerOptions: ["nous"],
+    isOpenSource: true,
+  },
+  hermes4_70b: {
+    title: "Hermes 4 70B",
+    description:
+      "Nous Research's Hermes 4 70B with reasoning capabilities and 128k context.",
+    refUrl: "https://nousresearch.com",
+    params: {
+      title: "Hermes 4 70B",
+      model: "Hermes-4-70B",
+      contextLength: 128_000,
+    },
+    icon: "nous.png",
+    providerOptions: ["nous"],
+    isOpenSource: true,
+  },
+  hermes43_36b: {
+    title: "Hermes 4.3 36B",
+    description:
+      "Nous Research's Hermes 4.3 36B, a compact reasoning model with 128k context.",
+    refUrl: "https://nousresearch.com",
+    params: {
+      title: "Hermes 4.3 36B",
+      model: "Hermes-4.3-36B",
+      contextLength: 128_000,
+    },
+    icon: "nous.png",
+    providerOptions: ["nous"],
+    isOpenSource: true,
+  },
   deepseekV3Chat: {
     title: "deepseek v3",
     description: "A model from deekseek for chat",
@@ -98,7 +168,24 @@ export const models: { [key: string]: ModelPackage } = {
       contextLength: 128_000,
     },
     icon: "openai.png",
-    providerOptions: ["vllm"],
+    dimensions: [
+      {
+        name: "Provider",
+        description: "The provider to use for this model",
+        options: {
+          vllm: {
+            model: "openai/gpt-oss-20b",
+            title: "gpt-oss-20b (vLLM)",
+          },
+          ovhcloud: {
+            model: "gpt-oss-20b",
+            title: "gpt-oss-20b (OVHcloud)",
+            contextLength: 131072,
+          },
+        },
+      },
+    ],
+    providerOptions: ["vllm", "ovhcloud"],
     isOpenSource: true,
   },
   gptOss120B: {
@@ -112,7 +199,24 @@ export const models: { [key: string]: ModelPackage } = {
       contextLength: 128_000,
     },
     icon: "openai.png",
-    providerOptions: ["vllm"],
+    dimensions: [
+      {
+        name: "Provider",
+        description: "The provider to use for this model",
+        options: {
+          vllm: {
+            model: "openai/gpt-oss-120b",
+            title: "gpt-oss-120b (vLLM)",
+          },
+          ovhcloud: {
+            model: "gpt-oss-120b",
+            title: "gpt-oss-120b (OVHcloud)",
+            contextLength: 131072,
+          },
+        },
+      },
+    ],
+    providerOptions: ["vllm", "ovhcloud"],
     isOpenSource: true,
   },
   llama318BChat: {
@@ -1896,6 +2000,49 @@ export const models: { [key: string]: ModelPackage } = {
     providerOptions: ["scaleway", "nebius", "ovhcloud", "ncompass"],
     isOpenSource: true,
   },
+  Qwen3Coder30BA3B: {
+    title: "Qwen 3 Coder 30B A3B",
+    description:
+      "Qwen3-Coder-30B-A3B-Instruct is Alibaba Cloud's advanced code-specialized LLM that excels in agentic coding tasks and supports extended context lengths for handling large code repositories.",
+    refUrl: "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct",
+    params: {
+      title: "Qwen 3 Coder 30B A3B",
+      model: "qwen3-coder-30b-a3b",
+      contextLength: 262144,
+    },
+    icon: "qwen.png",
+    providerOptions: ["ovhcloud"],
+    isOpenSource: true,
+  },
+  Qwen25VL72B: {
+    title: "Qwen 2.5 VL 72B",
+    description:
+      "Qwen2.5-VL is a powerful vision-language model, designed for advanced image understanding. It can generate detailed image captions, analyze documents, OCR, detect objects, and answer questions based on visuals.",
+    refUrl: "https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct",
+    params: {
+      title: "Qwen 2.5 VL 72B",
+      model: "qwen2.5-vl-72b",
+      contextLength: 32768,
+    },
+    icon: "qwen.png",
+    providerOptions: ["ovhcloud"],
+    isOpenSource: true,
+  },
+  MistralSmall32: {
+    title: "Mistral Small 3.2 24B",
+    description:
+      "Building upon Mistral Small 3 (2501), Mistral Small 3.2 (2506) adds state-of-the-art vision understanding and enhances long context capabilities up to 128k tokens without compromising text performance.",
+    refUrl:
+      "https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+    params: {
+      title: "Mistral Small 3.2 24B",
+      model: "mistral-small-3.2-24b",
+      contextLength: 131072,
+    },
+    icon: "mistral.png",
+    providerOptions: ["ovhcloud"],
+    isOpenSource: true,
+  },
   grokCodeFast1: {
     title: "Grok Code Fast 1",
     description:
@@ -2215,11 +2362,11 @@ export const models: { [key: string]: ModelPackage } = {
     description: "Qwen 3 32B model from Alibaba",
     params: {
       title: "Qwen 3 32B",
-      model: "Qwen3-32B",
-      contextLength: 8192,
+      model: "qwen3-32b",
+      contextLength: 32768,
     },
     icon: "qwen.png",
-    providerOptions: ["sambanova"],
+    providerOptions: ["sambanova", "ovhcloud"],
     isOpenSource: true,
   },
   gptOss120b: {
@@ -2473,6 +2620,100 @@ export const models: { [key: string]: ModelPackage } = {
     icon: "anthropic.png",
     isOpenSource: false,
   },
+  asksageclaude45sonnetgov: {
+    title: "Claude 4.5 Sonnet gov*",
+    description: "Anthropic's 4.5 Sonnet model.",
+    params: {
+      model: "aws-bedrock-claude-45-sonnet-gov",
+      contextLength: 200_000,
+      title: "Claude 4.5 Sonnet gov*",
+      apiKey: "",
+    },
+    providerOptions: ["askSage"],
+    icon: "anthropic.png",
+    isOpenSource: false,
+  },
+  asksageclaude45opus: {
+    title: "Claude 4.5 Opus*",
+    description: "Claude 4.5 Opus",
+    params: {
+      model: "google-claude-45-opus",
+      contextLength: 200_000,
+      title: "Claude 4.5 Opus*",
+      apiKey: "",
+    },
+    providerOptions: ["askSage"],
+    icon: "anthropic.png",
+    isOpenSource: false,
+  },
+  asksageclaude45haiku: {
+    title: "Claude 4.5 Haiku*",
+    description: "Claude 4.5 Haiku",
+    params: {
+      model: "google-claude-45-haiku",
+      contextLength: 200_000,
+      title: "Claude 4.5 Haiku*",
+      apiKey: "",
+    },
+    providerOptions: ["askSage"],
+    icon: "anthropic.png",
+    isOpenSource: false,
+  },
+  asksagegpt51: {
+    title: "GPT-5.1*",
+    description: "OpenAI's GPT-5.1 model",
+    params: {
+      model: "gpt-5.1",
+      contextLength: 400_000,
+      maxTokens: 200_000,
+      title: "GPT-5.1*",
+      apiKey: "",
+    },
+    providerOptions: ["askSage"],
+    icon: "openai.png",
+    isOpenSource: false,
+  },
+  asksagegpt52: {
+    title: "GPT-5.2*",
+    description: "OpenAI's GPT-5.2 model",
+    params: {
+      model: "gpt-5.2",
+      contextLength: 400_000,
+      maxTokens: 200_000,
+      title: "GPT-5.2*",
+      apiKey: "",
+    },
+    providerOptions: ["askSage"],
+    icon: "openai.png",
+    isOpenSource: false,
+  },
+  asksagegpt03mini: {
+    title: "GPT-o3-mini",
+    description: "Azure OpenAI GPT o3-mini model.",
+    params: {
+      model: "gpt-o3-mini",
+      contextLength: 200_000,
+      maxTokens: 100_000,
+      title: "GPT-o3-mini",
+      apiKey: "",
+    },
+    providerOptions: ["askSage"],
+    icon: "openai.png",
+    isOpenSource: false,
+  },
+  asksagegroqllama4scout: {
+    title: "Llama 4 Scout",
+    description: "Llama-4 Scout is a large language model customized by Groq.",
+    params: {
+      title: "Llama 4 Scout",
+      model: "groq-llama4-scout",
+      contextLength: 128_000,
+      apiKey: "",
+    },
+    providerOptions: ["askSage"],
+    icon: "groq.png",
+    isOpenSource: true,
+  },
 
   // Gemini series models via CometAPI
   cometapiGemini25Pro: {
@@ -2659,6 +2900,22 @@ export const models: { [key: string]: ModelPackage } = {
     },
     providerOptions: ["cometapi"],
     icon: "cometapi.png",
+    isOpenSource: false,
+  },
+
+  // Xiaomi Mimo models
+  mimoV2Flash: {
+    title: "mimo-v2-flash",
+    description: "Xiaomi's fast and efficient language model",
+    refUrl: "https://platform.xiaomimimo.com/",
+    params: {
+      title: "mimo-v2-flash",
+      model: "mimo-v2-flash",
+      contextLength: 128_000,
+      apiKey: "",
+    },
+    providerOptions: ["mimo"],
+    icon: "mimo.png",
     isOpenSource: false,
   },
 };

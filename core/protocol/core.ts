@@ -28,6 +28,7 @@ import {
   FileSymbolMap,
   IdeSettings,
   LLMFullCompletionOptions,
+  McpUiState,
   MessageOption,
   ModelDescription,
   PromptLog,
@@ -95,6 +96,7 @@ export type ToCoreFromIdeOrWebviewProtocol = {
     void,
   ];
   "config/addGlobalRule": [undefined | { baseFilename?: string }, void];
+  "config/deleteRule": [{ filepath: string }, void];
   "config/newPromptFile": [undefined, void];
   "config/newAssistantFile": [undefined, void];
   "config/ideSettingsUpdate": [IdeSettings, void];
@@ -315,6 +317,7 @@ export type ToCoreFromIdeOrWebviewProtocol = {
       contextItems: ContextItem[];
       errorMessage?: string;
       errorReason?: ContinueErrorReason;
+      mcpUiState?: McpUiState;
     },
   ];
   "tools/evaluatePolicy": [

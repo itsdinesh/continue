@@ -2,7 +2,10 @@ import {
   DataDestination,
   ModelRole,
   PromptTemplates,
+  ToolOverrideConfig,
 } from "@continuedev/config-yaml";
+import { McpUiResourceMeta } from "@modelcontextprotocol/ext-apps";
+import { TextResourceContents } from "@modelcontextprotocol/sdk/types.js";
 import Parser from "web-tree-sitter";
 import { CodebaseIndexer } from "./indexing/CodebaseIndexer";
 import { LLMConfigurationStatuses } from "./llm/constants";
@@ -290,6 +293,7 @@ export interface BaseSessionMetadata {
   title: string;
   dateCreated: string;
   workspaceDirectory: string;
+  messageCount?: number;
 }
 
 export interface RangeInFile {
@@ -497,6 +501,16 @@ export type ToolStatus =
   | "done" // Tool execution completed successfully
   | "canceled"; // Tool call was canceled by user or system
 
+interface McpUiResourceContents extends TextResourceContents {
+  _meta?: {
+    ui?: McpUiResourceMeta;
+  };
+}
+
+interface McpUiState {
+  content: McpUiResourceContents;
+}
+
 // Will exist only on "assistant" messages with tool calls
 interface ToolCallState {
   toolCallId: string;
@@ -506,6 +520,7 @@ interface ToolCallState {
   processedArgs?: Record<string, any>; // Added in preprocesing step
   output?: ContextItem[];
   tool?: Tool;
+  mcpUiState?: McpUiState;
 }
 
 interface Reasoning {
@@ -694,6 +709,9 @@ export interface LLMOptions {
 
   sourceFile?: string;
   isFromAutoDetect?: boolean;
+
+  /** Tool overrides for this model */
+  toolOverrides?: ToolOverride[];
 }
 
 type RequireAtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
@@ -840,6 +858,8 @@ export interface IDE {
   fileExists(fileUri: string): Promise<boolean>;
 
   writeFile(path: string, contents: string): Promise<void>;
+
+  removeFile(path: string): Promise<void>;
 
   showVirtualFile(title: string, contents: string): Promise<void>;
 
@@ -1102,6 +1122,13 @@ export interface ToolExtras {
   codeBaseIndexer?: CodebaseIndexer;
 }
 
+export interface McpToolMeta {
+  ui?: {
+    resourceUri?: string;
+  };
+  "ui/resourceUri"?: string;
+}
+
 export interface Tool {
   type: "function";
   function: {
@@ -1137,7 +1164,17 @@ export interface Tool {
     parsedArgs: Record<string, unknown>,
     processedArgs?: Record<string, unknown>,
   ) => ToolPolicy;
+  mcpMeta?: McpToolMeta;
 }
+
+/**
+ * Configuration for overriding built-in tool prompts.
+ * Extends ToolOverrideConfig with required name for array usage.
+ */
+export type ToolOverride = ToolOverrideConfig & {
+  /** Tool name to override (matches function.name, e.g., "read_file") */
+  name: string;
+};
 
 interface ToolChoice {
   type: "function";
@@ -1152,9 +1189,10 @@ export interface ConfigDependentToolParams {
   isSignedIn: boolean;
   isRemote: boolean;
   modelName: string | undefined;
+  ide: IDE;
 }
 
-export type GetTool = (params: ConfigDependentToolParams) => Tool;
+export type GetTool = (params: ConfigDependentToolParams) => Promise<Tool>;
 
 export interface BaseCompletionOptions {
   temperature?: number;
@@ -1354,6 +1392,7 @@ export interface MCPTool {
     type: "object";
     properties?: Record<string, any>;
   };
+  _meta?: Record<string, unknown> | undefined;
 }
 
 type BaseInternalMCPOptions = {
@@ -1894,6 +1933,15 @@ export interface RuleMetadata {
 }
 export interface RuleWithSource extends RuleMetadata {
   rule: string;
+}
+
+export interface Skill {
+  name: string;
+  description: string;
+  path: string;
+  content: string;
+  files: string[];
+  license?: string;
 }
 
 export interface CompleteOnboardingPayload {
