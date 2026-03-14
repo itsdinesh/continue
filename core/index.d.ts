@@ -1,8 +1,8 @@
 import {
-  DataDestination,
-  ModelRole,
-  PromptTemplates,
-  ToolOverrideConfig,
+    DataDestination,
+    ModelRole,
+    PromptTemplates,
+    ToolOverrideConfig,
 } from "@continuedev/config-yaml";
 import { ToolPolicy } from "@continuedev/terminal-security";
 import { McpUiResourceMeta } from "@modelcontextprotocol/ext-apps";
@@ -651,6 +651,7 @@ export interface LLMOptions {
   baseAgentSystemMessage?: string;
   basePlanSystemMessage?: string;
   baseChatSystemMessage?: string;
+  baseEditSystemMessage?: string;
   autocompleteOptions?: Partial<TabAutocompleteOptions>;
   contextLength?: number;
   maxStopWords?: number;
@@ -1246,6 +1247,7 @@ export interface ModelDescription {
   baseAgentSystemMessage?: string;
   basePlanSystemMessage?: string;
   baseChatSystemMessage?: string;
+  baseEditSystemMessage?: string;
   requestOptions?: RequestOptions;
   promptTemplates?: { [key: string]: string };
   cacheBehavior?: CacheBehavior;
@@ -1724,6 +1726,7 @@ export interface JSONModelDescription {
   template?: TemplateType;
   completionOptions?: BaseCompletionOptions;
   systemMessage?: string;
+  baseEditSystemMessage?: string;
   requestOptions?: RequestOptions;
   cacheBehavior?: CacheBehavior;
 

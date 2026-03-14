@@ -1,21 +1,21 @@
 import {
-  ChatMessage,
-  DiffLine,
-  ILLM,
-  Prediction,
-  RuleWithSource,
-  StreamDiffLinesPayload,
-  ToolResultChatMessage,
-  UserChatMessage,
+    ChatMessage,
+    DiffLine,
+    ILLM,
+    Prediction,
+    RuleWithSource,
+    StreamDiffLinesPayload,
+    ToolResultChatMessage,
+    UserChatMessage,
 } from "../";
 import {
-  filterCodeBlockLines,
-  filterEnglishLinesAtEnd,
-  filterEnglishLinesAtStart,
-  filterLeadingAndTrailingNewLineInsertion,
-  removeTrailingWhitespace,
-  skipLines,
-  stopAtLines
+    filterCodeBlockLines,
+    filterEnglishLinesAtEnd,
+    filterEnglishLinesAtStart,
+    filterLeadingAndTrailingNewLineInsertion,
+    removeTrailingWhitespace,
+    skipLines,
+    stopAtLines
 } from "../autocomplete/filtering/streamTransforms/lineStream";
 import { streamDiff } from "../diff/streamDiff";
 import { streamLines } from "../diff/util";
@@ -160,7 +160,7 @@ export async function* streamDiffLines(
   // Rules can be included with edit prompt
   // If any rules are present this will result in using chat instead of legacy completion
   const systemMessage =
-    rulesToInclude || llm.baseChatSystemMessage
+    rulesToInclude || llm.baseChatSystemMessage || llm.baseEditSystemMessage
       ? getSystemMessageWithRules({
           availableRules: rulesToInclude ?? [],
           userMessage:
@@ -173,7 +173,10 @@ export async function* streamDiffLines(
                   prompt,
                   (msg) => msg.role === "user" || msg.role === "tool",
                 ) as UserChatMessage | ToolResultChatMessage | undefined),
-          baseSystemMessage: llm.baseChatSystemMessage,
+          baseSystemMessage:
+            type === "edit"
+              ? (llm.baseEditSystemMessage ?? llm.baseChatSystemMessage)
+              : (llm.baseChatSystemMessage ?? llm.baseEditSystemMessage),
           contextItems: [],
         }).systemMessage
       : undefined;

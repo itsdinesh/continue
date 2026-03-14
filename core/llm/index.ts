@@ -2,34 +2,34 @@ import { ModelRole } from "@continuedev/config-yaml";
 import { fetchwithRequestOptions } from "@continuedev/fetch";
 import { findLlmInfo } from "@continuedev/llm-info";
 import {
-  BaseLlmApi,
-  ChatCompletionCreateParams,
-  constructLlmApi,
+    BaseLlmApi,
+    ChatCompletionCreateParams,
+    constructLlmApi,
 } from "@continuedev/openai-adapters";
 import Handlebars from "handlebars";
 
 import { DevDataSqliteDb } from "../data/devdataSqlite.js";
 import { DataLogger } from "../data/log.js";
 import {
-  CacheBehavior,
-  ChatMessage,
-  Chunk,
-  CompletionOptions,
-  ILLM,
-  ILLMInteractionLog,
-  ILLMLogger,
-  LLMFullCompletionOptions,
-  LLMOptions,
-  MessageOption,
-  ModelCapability,
-  ModelInstaller,
-  PromptLog,
-  PromptTemplate,
-  RequestOptions,
-  TabAutocompleteOptions,
-  TemplateType,
-  ToolOverride,
-  Usage,
+    CacheBehavior,
+    ChatMessage,
+    Chunk,
+    CompletionOptions,
+    ILLM,
+    ILLMInteractionLog,
+    ILLMLogger,
+    LLMFullCompletionOptions,
+    LLMOptions,
+    MessageOption,
+    ModelCapability,
+    ModelInstaller,
+    PromptLog,
+    PromptTemplate,
+    RequestOptions,
+    TabAutocompleteOptions,
+    TemplateType,
+    ToolOverride,
+    Usage,
 } from "../index.js";
 import { isAbortError } from "../util/isAbortError.js";
 import { isLemonadeInstalled } from "../util/lemonadeHelper.js";
@@ -40,34 +40,34 @@ import { isOllamaInstalled } from "../util/ollamaHelper.js";
 import { TokensBatchingService } from "../util/TokensBatchingService.js";
 import { withExponentialBackoff } from "../util/withExponentialBackoff.js";
 
+import { applyToolOverrides } from "../tools/applyToolOverrides.js";
 import {
-  autodetectPromptTemplates,
-  autodetectTemplateFunction,
-  autodetectTemplateType,
-  modelSupportsImages,
+    autodetectPromptTemplates,
+    autodetectTemplateFunction,
+    autodetectTemplateType,
+    modelSupportsImages,
 } from "./autodetect.js";
 import {
-  DEFAULT_ARGS,
-  DEFAULT_CONTEXT_LENGTH,
-  DEFAULT_MAX_BATCH_SIZE,
-  DEFAULT_MAX_CHUNK_SIZE,
-  DEFAULT_MAX_TOKENS,
-  LLMConfigurationStatuses,
+    DEFAULT_ARGS,
+    DEFAULT_CONTEXT_LENGTH,
+    DEFAULT_MAX_BATCH_SIZE,
+    DEFAULT_MAX_CHUNK_SIZE,
+    DEFAULT_MAX_TOKENS,
+    LLMConfigurationStatuses,
 } from "./constants.js";
 import {
-  compileChatMessages,
-  countTokens,
-  pruneRawPromptFromTop,
+    compileChatMessages,
+    countTokens,
+    pruneRawPromptFromTop,
 } from "./countTokens.js";
 import {
-  fromChatCompletionChunk,
-  fromChatResponse,
-  LlmApiRequestType,
-  toChatBody,
-  toCompleteBody,
-  toFimBody,
+    fromChatCompletionChunk,
+    fromChatResponse,
+    LlmApiRequestType,
+    toChatBody,
+    toCompleteBody,
+    toFimBody,
 } from "./openaiTypeConverters.js";
-import { applyToolOverrides } from "../tools/applyToolOverrides.js";
 
 export class LLMError extends Error {
   constructor(
@@ -152,6 +152,7 @@ export abstract class BaseLLM implements ILLM {
 
   title?: string;
   baseChatSystemMessage?: string;
+  baseEditSystemMessage?: string;
   basePlanSystemMessage?: string;
   baseAgentSystemMessage?: string;
   _contextLength: number | undefined;
@@ -237,6 +238,7 @@ export abstract class BaseLLM implements ILLM {
     this.baseAgentSystemMessage = options.baseAgentSystemMessage;
     this.basePlanSystemMessage = options.basePlanSystemMessage;
     this.baseChatSystemMessage = options.baseChatSystemMessage;
+    this.baseEditSystemMessage = options.baseEditSystemMessage;
     this._contextLength = options.contextLength ?? llmInfo?.contextLength;
     this.maxStopWords = options.maxStopWords ?? this.maxStopWords;
     this.completionOptions = {

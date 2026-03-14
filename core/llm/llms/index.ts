@@ -31,13 +31,13 @@ import HuggingFaceTEIEmbeddingsProvider from "./HuggingFaceTEI";
 import HuggingFaceTGI from "./HuggingFaceTGI";
 import Inception from "./Inception";
 import Kindo from "./Kindo";
+import Lemonade from "./Lemonade";
 import LlamaCpp from "./LlamaCpp";
 import Llamafile from "./Llamafile";
 import LlamaStack from "./LlamaStack";
-import Lemonade from "./Lemonade";
 import LMStudio from "./LMStudio";
-import Mistral from "./Mistral";
 import Mimo from "./Mimo";
+import Mistral from "./Mistral";
 import MockLLM from "./Mock";
 import Moonshot from "./Moonshot";
 import Msty from "./Msty";
@@ -164,6 +164,18 @@ export async function llmFromDescription(
     );
   }
 
+  let baseEditSystemMessage: string | undefined = undefined;
+  if (desc.baseEditSystemMessage !== undefined) {
+    baseEditSystemMessage = await renderTemplatedString(
+      Handlebars,
+      desc.baseEditSystemMessage,
+      {},
+      [],
+      readFile,
+      getUriFromPath,
+    );
+  }
+
   let options: LLMOptions = {
     ...desc,
     completionOptions: {
@@ -176,6 +188,7 @@ export async function llmFromDescription(
     baseChatSystemMessage,
     basePlanSystemMessage: baseChatSystemMessage,
     baseAgentSystemMessage: baseChatSystemMessage,
+    baseEditSystemMessage: baseEditSystemMessage ?? baseChatSystemMessage,
     logger: llmLogger,
     uniqueId,
   };

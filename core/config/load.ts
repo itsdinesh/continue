@@ -5,31 +5,31 @@ import path from "path";
 import { IDE, ILLM } from "../index.js";
 
 import {
-  ConfigResult,
-  ConfigValidationError,
-  mergeConfigYamlRequestOptions,
-  ModelRole,
+    ConfigResult,
+    ConfigValidationError,
+    mergeConfigYamlRequestOptions,
+    ModelRole,
 } from "@continuedev/config-yaml";
 import * as JSONC from "comment-json";
 
 import {
-  BrowserSerializedContinueConfig,
-  Config,
-  ContextProviderWithParams,
-  ContinueConfig,
-  ContinueRcJson,
-  CustomContextProvider,
-  EmbeddingsProviderDescription,
-  IdeInfo,
-  IdeSettings,
-  IdeType,
-  ILLMLogger,
-  InternalMcpOptions,
-  LLMOptions,
-  ModelDescription,
-  RerankerDescription,
-  SerializedContinueConfig,
-  SlashCommandWithSource
+    BrowserSerializedContinueConfig,
+    Config,
+    ContextProviderWithParams,
+    ContinueConfig,
+    ContinueRcJson,
+    CustomContextProvider,
+    EmbeddingsProviderDescription,
+    IdeInfo,
+    IdeSettings,
+    IdeType,
+    ILLMLogger,
+    InternalMcpOptions,
+    LLMOptions,
+    ModelDescription,
+    RerankerDescription,
+    SerializedContinueConfig,
+    SlashCommandWithSource
 } from "..";
 import { getLegacyBuiltInSlashCommandFromDescription } from "../commands/slash/built-in-legacy";
 import { convertCustomCommandToSlashCommand } from "../commands/slash/customSlashCommand";
@@ -46,14 +46,14 @@ import { copyOf } from "../util";
 import { GlobalContext } from "../util/GlobalContext";
 import mergeJson from "../util/merge";
 import {
-  DEFAULT_CONFIG_TS_CONTENTS,
-  getConfigJsonPath,
-  getConfigJsonPathForRemote,
-  getConfigJsPath,
-  getConfigJsPathForRemote,
-  getConfigTsPath,
-  getContinueDotEnv,
-  getEsbuildBinaryPath,
+    DEFAULT_CONFIG_TS_CONTENTS,
+    getConfigJsonPath,
+    getConfigJsonPathForRemote,
+    getConfigJsPath,
+    getConfigJsPathForRemote,
+    getConfigTsPath,
+    getContinueDotEnv,
+    getEsbuildBinaryPath,
 } from "../util/paths";
 import { localPathToUri } from "../util/pathToUri";
 
@@ -66,9 +66,9 @@ import { getWorkspaceRcConfigs } from "./json/loadRcConfigs";
 import { loadConfigContextProviders } from "./loadContextProviders";
 import { modifyAnyConfigWithSharedConfig } from "./sharedConfig";
 import {
-  getModelByRole,
-  isSupportedLanceDbCpuTargetForLinux,
-  serializePromptTemplates,
+    getModelByRole,
+    isSupportedLanceDbCpuTargetForLinux,
+    serializePromptTemplates,
 } from "./util";
 import { validateConfig } from "./validation.js";
 
@@ -514,7 +514,6 @@ async function intermediateToFinalConfig({
       autocomplete: [...tabAutocompleteModels],
       embed: newEmbedder ? [newEmbedder] : [],
       rerank: newReranker ? [newReranker] : [],
-      subagent: [],
     },
     selectedModelByRole: {
       chat: null, // Not implemented (uses GUI defaultModel)
@@ -524,7 +523,6 @@ async function intermediateToFinalConfig({
       autocomplete: null,
       rerank: newReranker ?? null,
       summarize: null, // Not implemented
-      subagent: null,
     },
     rules: [],
   };
@@ -642,6 +640,7 @@ function llmToSerializedModelDescription(llm: ILLM): ModelDescription {
     baseAgentSystemMessage: llm.baseAgentSystemMessage,
     basePlanSystemMessage: llm.basePlanSystemMessage,
     baseChatSystemMessage: llm.baseChatSystemMessage,
+    baseEditSystemMessage: llm.baseEditSystemMessage,
     requestOptions: llm.requestOptions,
     promptTemplates: serializePromptTemplates(llm.promptTemplates),
     capabilities: llm.capabilities,
@@ -934,8 +933,8 @@ async function loadContinueConfigFromJson(
 }
 
 export {
-  finalToBrowserConfig,
-  loadContinueConfigFromJson,
-  type BrowserSerializedContinueConfig
+    finalToBrowserConfig,
+    loadContinueConfigFromJson,
+    type BrowserSerializedContinueConfig
 };
 
