@@ -137,7 +137,7 @@ export abstract class BaseLLM implements ILLM {
         return false;
       }
     }
-    if (["groq", "mistral", "deepseek"].includes(this.providerName)) {
+    if (["groq", "mistral", "deepseek", "moonshot"].includes(this.providerName)) {
       return false;
     }
     return true;

@@ -41,7 +41,12 @@ const NON_CHAT_MODELS = [
 
 function isChatOnlyModel(model: string): boolean {
   // gpt and o-series models
-  return model.startsWith("gpt") || model.startsWith("o");
+  return (
+    model.startsWith("gpt") ||
+    model.startsWith("o") ||
+    model.startsWith("kimi") ||
+    model.startsWith("moonshot")
+  );
 }
 
 const formatMessageForO1OrGpt5 = (messages: ChatCompletionMessageParam[]) => {

@@ -26,7 +26,7 @@ class Moonshot extends OpenAI {
     signal: AbortSignal,
     options: CompletionOptions,
   ): AsyncGenerator<string> {
-    const endpoint = new URL("v1/chat/completions", this.apiBase);
+    const endpoint = this._getEndpoint("chat/completions");
     const resp = await this.fetch(endpoint, {
       method: "POST",
       body: JSON.stringify({
@@ -45,11 +45,7 @@ class Moonshot extends OpenAI {
         stop: options.stop,
         stream: true,
       }),
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
+      headers: this._getHeaders(),
       signal,
     });
     for await (const chunk of streamSse(resp)) {
