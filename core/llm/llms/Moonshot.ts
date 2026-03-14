@@ -1,8 +1,35 @@
 import { streamSse } from "@continuedev/fetch";
-import { CompletionOptions, LLMOptions } from "../../index.js";
+import { ChatMessage, CompletionOptions, LLMOptions, PromptTemplate } from "../../index.js";
 import { osModelsEditPrompt } from "../templates/edit.js";
 
 import OpenAI from "./OpenAI.js";
+
+const kimiEditPrompt: PromptTemplate = (history: ChatMessage[], otherData: Record<string, string>) => {
+  return [
+    {
+      role: "user",
+      content: `Edit the following code:
+\`\`\`python
+def hello():
+    print("hello")
+\`\`\`
+Request: add a name parameter`,
+    },
+    {
+      role: "assistant",
+      content: `def hello(name):
+    print(f"hello {name}")`,
+    },
+    {
+      role: "user",
+      content: `Edit the following code:
+\`\`\`${otherData.language}
+${otherData.codeToEdit}
+\`\`\`
+Request: ${otherData.userInput}`,
+    },
+  ];
+};
 
 class Moonshot extends OpenAI {
   static providerName = "moonshot";
@@ -10,7 +37,7 @@ class Moonshot extends OpenAI {
     apiBase: "https://api.moonshot.cn/v1/",
     model: "moonshot-v1-8k",
     promptTemplates: {
-      edit: osModelsEditPrompt,
+      edit: kimiEditPrompt,
     },
     useLegacyCompletionsEndpoint: false,
   };

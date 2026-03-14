@@ -40,6 +40,10 @@ function isEnglishFirstLine(line: string) {
     return true;
   }
 
+  if (line.match(/^\d+\./) || line.startsWith("- ") || line.startsWith("* ")) {
+    return true;
+  }
+
   return ENGLISH_START_PHRASES.some((phrase) => line.startsWith(phrase));
 }
 
@@ -190,6 +194,11 @@ export const ENGLISH_START_PHRASES = [
   "certainly",
   "of course",
   "the code should",
+  "i ",
+  "i'm ",
+  "let's ",
+  "let me ",
+  "starting with ",
 ];
 
 export const ENGLISH_POST_PHRASES = [
@@ -471,24 +480,27 @@ export async function* removeTrailingWhitespace(
  * 4. Yields all remaining lines.
  */
 export async function* filterEnglishLinesAtStart(lines: LineStream) {
-  let i = 0;
-  let wasEnglishFirstLine = false;
-  for await (const line of lines) {
-    if (i === 0 && line.trim() === "") {
-      continue;
-    }
+  let isSkipping = true;
+  let linesSkipped = 0;
 
-    if (i === 0) {
-      if (isEnglishFirstLine(line)) {
-        wasEnglishFirstLine = true;
-        i++;
+  for await (const line of lines) {
+    if (isSkipping) {
+      if (line.trim() === "") {
+        linesSkipped++;
         continue;
       }
-    } else if (i === 1 && wasEnglishFirstLine && line.trim() === "") {
-      i++;
-      continue;
+
+      if (isEnglishFirstLine(line)) {
+        linesSkipped++;
+        // Limit skipping to the first 10 lines to be safe
+        if (linesSkipped < 10) {
+          continue;
+        }
+      }
+
+      isSkipping = false;
     }
-    i++;
+
     yield line;
   }
 }
