@@ -4,6 +4,7 @@ import {
   PromptTemplates,
   ToolOverrideConfig,
 } from "@continuedev/config-yaml";
+import { ToolPolicy } from "@continuedev/terminal-security";
 import { McpUiResourceMeta } from "@modelcontextprotocol/ext-apps";
 import { TextResourceContents } from "@modelcontextprotocol/sdk/types.js";
 import Parser from "web-tree-sitter";
@@ -1254,6 +1255,9 @@ export interface ModelDescription {
 
   sourceFile?: string;
   isFromAutoDetect?: boolean;
+
+  /** Tool overrides for this model */
+  toolOverrides?: ToolOverride[];
 }
 
 export interface JSONEmbedOptions {

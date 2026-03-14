@@ -1,3 +1,5 @@
+import { isAbortError } from "../../util/isAbortError.js";
+
 /**
  * Configuration options for the retry decorator
  */
@@ -68,6 +70,11 @@ function defaultShouldRetry(error: any, attempt: number): boolean {
     return true;
   }
 
+  // Embedded rate limiting (e.g., Gemini/VertexAI return 429 in response body)
+  if (/"code"\s*:\s*429/.test(error.message ?? "")) {
+    return true;
+  }
+
   // HTTP status codes
   if (error.status || error.statusCode) {
     const status = error.status || error.statusCode;
@@ -98,7 +105,7 @@ function defaultShouldRetry(error: any, attempt: number): boolean {
   }
 
   // Abort signal errors should not be retried
-  if (error.name === "AbortError" || error.code === "ABORT_ERR") {
+  if (isAbortError(error)) {
     return false;
   }
 

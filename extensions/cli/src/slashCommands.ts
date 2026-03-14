@@ -143,8 +143,6 @@ async function handleFork() {
 }
 
 function handleTitle(args: string[]) {
-  posthogService.capture("useSlashCommand", { name: "title" });
-
   const title = args.join(" ").trim();
   if (!title) {
     return {
@@ -167,6 +165,14 @@ function handleTitle(args: string[]) {
       output: chalk.red(`Failed to update title: ${error.message}`),
     };
   }
+}
+
+function handleJobs() {
+  return { openJobsSelector: true };
+}
+
+function handleSessions() {
+  return { openSessionSelector: true };
 }
 
 const commandHandlers: Record<string, CommandHandler> = {
@@ -196,13 +202,15 @@ const commandHandlers: Record<string, CommandHandler> = {
   },
   fork: handleFork,
   title: handleTitle,
+  rename: handleTitle,
   init: (args, assistant) => {
-    posthogService.capture("useSlashCommand", { name: "init" });
     return handleInit(args, assistant);
   },
   update: () => {
     return { openUpdateSelector: true };
   },
+  jobs: handleJobs,
+  sessions: handleSessions,
 };
 
 export async function handleSlashCommands(
