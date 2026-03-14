@@ -52,24 +52,21 @@ export async function* recursiveStream(
       totalTokens += countTokens(chunk);
 
       if (totalTokens >= safeTokens) {
-        throw new Error(
-          "Token limit reached. File/range likely too large for this edit",
-        );
-        // const continuationPrompt = `${RECURSIVE_PROMPT}:\n\n${buffer}`;
+        const continuationPrompt = `${RECURSIVE_PROMPT}:\n\n${buffer}`;
 
-        // await generator.return(DUD_PROMPT_LOG); // kill the previous generator
+        await generator.return(DUD_PROMPT_LOG); // kill the previous generator
 
-        // // TODO - Prediction capabilities lost because of partial input
-        // yield* recursiveStream(
-        //   llm,
-        //   abortController,
-        //   continuationPrompt,
-        //   undefined,
-        //   buffer,
-        //   true,
-        // ); // Recursively stream the continuation
+        yield* recursiveStream(
+          llm,
+          abortController,
+          type,
+          continuationPrompt,
+          undefined,
+          buffer,
+          true,
+        ); // Recursively stream the continuation
 
-        // return;
+        return;
       }
     }
   } else {
@@ -90,31 +87,29 @@ export async function* recursiveStream(
       totalTokens += countTokens(chunk.content);
 
       if (totalTokens >= safeTokens) {
-        throw new Error(
-          "Token limit reached. File/range likely too large for this edit",
-        );
-        // const continuationPrompt: ChatMessage[] = [
-        //   ...(isContinuation ? prompt.slice(0, -2) : prompt),
-        //   {
-        //     role: "assistant",
-        //     content: buffer,
-        //   },
-        //   {
-        //     role: "user",
-        //     content: RECURSIVE_PROMPT,
-        //   },
-        // ];
+        const continuationPrompt: ChatMessage[] = [
+          ...(isContinuation ? (prompt as ChatMessage[]).slice(0, -2) : (prompt as ChatMessage[])),
+          {
+            role: "assistant",
+            content: buffer,
+          },
+          {
+            role: "user",
+            content: RECURSIVE_PROMPT,
+          },
+        ];
 
-        // await generator.return(DUD_PROMPT_LOG);
-        // yield* recursiveStream(
-        //   llm,
-        //   abortController,
-        //   continuationPrompt,
-        //   undefined,
-        //   buffer,
-        //   true,
-        // );
-        // return;
+        await generator.return(DUD_PROMPT_LOG);
+        yield* recursiveStream(
+          llm,
+          abortController,
+          type,
+          continuationPrompt,
+          undefined,
+          buffer,
+          true,
+        );
+        return;
       }
     }
   }
