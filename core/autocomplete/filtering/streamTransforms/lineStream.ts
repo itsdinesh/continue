@@ -199,6 +199,13 @@ export const ENGLISH_START_PHRASES = [
   "let's ",
   "let me ",
   "starting with ",
+  "the user wants ",
+  "i will ",
+  "this code ",
+  "adding ",
+  "i need to ",
+  "the comments should ",
+  "since ",
 ];
 
 export const ENGLISH_POST_PHRASES = [
@@ -492,8 +499,8 @@ export async function* filterEnglishLinesAtStart(lines: LineStream) {
 
       if (isEnglishFirstLine(line)) {
         linesSkipped++;
-        // Limit skipping to the first 10 lines to be safe
-        if (linesSkipped < 10) {
+        // Limit skipping to the first 20 lines to be safe
+        if (linesSkipped < 20) {
           continue;
         }
       }
