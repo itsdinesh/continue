@@ -7,26 +7,18 @@ import OpenAI from "./OpenAI.js";
 const kimiEditPrompt: PromptTemplate = (history: ChatMessage[], otherData: Record<string, string>) => {
   return [
     {
-      role: "user",
-      content: `Edit the following code:
-\`\`\`python
-def hello():
-    print("hello")
-\`\`\`
-Request: add a name parameter`,
-    },
-    {
-      role: "assistant",
-      content: `def hello(name):
-    print(f"hello {name}")`,
+      role: "system",
+      content: "You are a specialized code editing tool. Your output must be ONLY the requested code change, wrapped in a markdown code block. Do not explain yourself. Do not include any natural language.",
     },
     {
       role: "user",
-      content: `Edit the following code:
+      content: `Please rewrite the following code to satisfy this request: "${otherData.userInput}"
+
 \`\`\`${otherData.language}
 ${otherData.codeToEdit}
 \`\`\`
-Request: ${otherData.userInput}`,
+
+Rewritten code:`,
     },
   ];
 };

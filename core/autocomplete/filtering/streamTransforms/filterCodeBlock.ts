@@ -53,16 +53,16 @@ export async function* filterCodeBlockLines(
 
   // If no code blocks are detected at all, and it's not nested markdown,
   // we should just yield everything (assuming other filters handle any natural language)
-  if (!hasCodeBlocks && !hasNestedMarkdown) {
-    for (let i = 0; i < allLines.length; i++) {
-      const line = allLines[i];
-      if (i === 0 && shouldRemoveLineBeforeStart(line)) {
-        continue;
-      }
-      yield line;
-    }
-    return;
-  }
+  // if (!hasCodeBlocks && !hasNestedMarkdown) {
+  //   for (let i = 0; i < allLines.length; i++) {
+  //     const line = allLines[i];
+  //     if (i === 0 && shouldRemoveLineBeforeStart(line)) {
+  //       continue;
+  //     }
+  //     yield line;
+  //   }
+  //   return;
+  // }
 
   // If this is mixed content (headers + blocks), use simplified processing
   if (isMixedContent) {

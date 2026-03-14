@@ -213,6 +213,7 @@ export const ENGLISH_POST_PHRASES = [
   "here is",
   "here's how",
   "the above",
+  "and yeah ",
 ];
 
 export async function* noTopLevelKeywordsMidline(
