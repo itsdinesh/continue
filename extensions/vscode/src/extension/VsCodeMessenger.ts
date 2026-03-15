@@ -240,6 +240,7 @@ export class VsCodeMessenger {
         ),
         rulesToInclude: config.rules,
         isApply: false,
+        isInAgentMode: msg.data.isInAgentMode,
       });
 
       // Log dev data

@@ -453,6 +453,7 @@ export class VerticalDiffManager {
     toolCallId,
     rulesToInclude,
     isApply,
+    isInAgentMode,
   }: {
     input: string;
     llm: ILLM;
@@ -463,6 +464,7 @@ export class VerticalDiffManager {
     toolCallId?: string;
     rulesToInclude: undefined | RuleWithSource[];
     isApply: boolean;
+    isInAgentMode?: boolean;
   }): Promise<string | undefined> {
     void vscode.commands.executeCommand(
       "setContext",
@@ -646,6 +648,7 @@ export class VerticalDiffManager {
             newCode: newCode ?? "",
             includeRulesInSystemMessage: !!rulesToInclude && !isApply,
             modelTitle: llm.title ?? llm.model,
+            isInAgentMode,
           },
           llm,
           abortController,
@@ -654,26 +657,20 @@ export class VerticalDiffManager {
           isSelectionAtEndOfFile,
         );
 
-        // Collect all diff lines first instead of streaming them
-        const allDiffLines: DiffLine[] = [];
-        for await (const line of stream) {
-          if (line.type === "new" || line.type === "same") {
-            streamedLines.push(line.line);
+        for await (const diffLine of stream) {
+          if (diffLine.type === "new" || diffLine.type === "same") {
+            streamedLines.push(diffLine.line);
           }
-          allDiffLines.push(line);
+          yield diffLine;
         }
 
-        // If selection is at end of file, remove trailing empty lines from streamedLines
-        // This prevents unwanted newlines when the final content is assembled
+        // If selection is at end of file, we might have buffered newlines that we don't want
+        // But since we are yielding now, we can't easily retroactively change them in the UI.
+        // However, the side effect (streamedLines) is used for the final file content.
         if (isSelectionAtEndOfFile) {
           while (streamedLines.length > 0 && streamedLines[streamedLines.length - 1].trim() === "") {
             streamedLines.pop();
           }
-        }
-
-        // Now yield all lines at once to show the complete diff
-        for (const line of allDiffLines) {
-          yield line;
         }
       }
 

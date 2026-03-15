@@ -28,7 +28,7 @@ function isBracketEnding(line: string): boolean {
     .some((char) => BRACKET_ENDING_CHARS.includes(char));
 }
 
-function isEnglishFirstLine(line: string) {
+export function isEnglishFirstLine(line: string) {
   line = line.trim().toLowerCase();
 
   if (
@@ -206,6 +206,11 @@ export const ENGLISH_START_PHRASES = [
   "i need to ",
   "the comments should ",
   "since ",
+  "the enum ",
+  "i should ",
+  "i'll add ",
+  "i could ",
+  "actually, looking ",
 ];
 
 export const ENGLISH_POST_PHRASES = [

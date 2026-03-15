@@ -32,118 +32,63 @@ export async function* filterCodeBlockLines(
   rawLines: LineStream,
   filepath?: string,
 ): LineStream {
-  // Collect all lines for analysis
-  const allLines = await collectAllLines(rawLines);
+  let seenFirstFence = false;
+  let nestCount = 0;
+  let hasCheckedForCodeBlocks = false;
+  let buffer: string[] = [];
 
-  // Check if it has nested markdown blocks (like ```markdown or ```md)
-  const firstLine = allLines[0] || "";
-  const hasNestedMarkdown = hasNestedMarkdownBlocks(firstLine, filepath);
+  // If it's a markdown file, we might want to keep the "preamble" (headers etc.)
+  const isMarkdown = filepath ? isMarkdownFile(filepath) : false;
 
-  // TARGETED FIX: Detect if this is mixed content (markdown headers + code blocks)
-  // But exclude cases where we have nested markdown blocks
-  const hasMarkdownHeaders = allLines.some(
-    (line) => line.trim().startsWith("#") && !line.trim().startsWith("```"),
-  );
-
-  const hasCodeBlocks = allLines.some(
-    (line) => line.trim().startsWith("```") && line.trim().length >= 3,
-  );
-  const isMixedContent =
-    hasMarkdownHeaders && hasCodeBlocks && !hasNestedMarkdown;
-
-  // If no code blocks are detected at all, and it's not nested markdown,
-  // we should just yield everything (assuming other filters handle any natural language)
-  // if (!hasCodeBlocks && !hasNestedMarkdown) {
-  //   for (let i = 0; i < allLines.length; i++) {
-  //     const line = allLines[i];
-  //     if (i === 0 && shouldRemoveLineBeforeStart(line)) {
-  //       continue;
-  //     }
-  //     yield line;
-  //   }
-  //   return;
-  // }
-
-  // If this is mixed content (headers + blocks), use simplified processing
-  if (isMixedContent) {
-    for (let i = 0; i < allLines.length; i++) {
-      const line = allLines[i];
-
-      // Skip initial wrapper lines if they exist
-      if (i === 0 && shouldRemoveLineBeforeStart(line)) {
+  for await (const line of rawLines) {
+    if (!seenFirstFence) {
+      if (shouldRemoveLineBeforeStart(line)) {
+        seenFirstFence = true;
+        nestCount = 1;
         continue;
       }
 
-      yield line;
-    }
-    return;
-  }
-
-  // Original logic for non-mixed content
-  let seenFirstFence = false;
-  let nestCount = 0;
-
-  // Create optimized state tracker for markdown block analysis if needed
-  let markdownStateTracker: MarkdownBlockStateTracker | undefined;
-  if (hasNestedMarkdown) {
-    markdownStateTracker = new MarkdownBlockStateTracker(allLines);
-  }
-
-  for (let i = 0; i < allLines.length; i++) {
-    const line = allLines[i];
-
-    // Process block nesting logic for the first fence
-    const nesting = processBlockNesting(
-      line,
-      seenFirstFence,
-      shouldRemoveLineBeforeStart,
-    );
-    if (nesting.shouldSkip) {
-      continue; // Filter out starting ``` or START block
-    }
-    if (!seenFirstFence && nesting.newSeenFirstFence) {
-      seenFirstFence = true;
-      nestCount = 1;
+      // If we haven't seen a fence yet, buffer the lines until we're sure if there are ANY fences
+      if (!isMarkdown) {
+        buffer.push(line);
+        // Only yield if we've determined there are likely NO fences
+        if (buffer.length > 50) {
+          for (const bufferedLine of buffer) {
+            yield bufferedLine;
+          }
+          buffer = [];
+          seenFirstFence = true;
+          nestCount = 1;
+        }
+      } else {
+        // For markdown files, we just yield everything until we see a fence, then handle nesting
+        yield line;
+      }
+      continue;
     }
 
     if (nestCount > 0) {
-      // Inside a block including the outer block
       const changedEndLine = shouldChangeLineAndStop(line);
       if (typeof changedEndLine === "string") {
-        // Ending a block with just backticks (```) or STOP
-
-        // For markdown files with nested markdown blocks, apply special logic
-        if (
-          hasNestedMarkdown &&
-          line.trim() === "```" &&
-          markdownStateTracker
-        ) {
-          if (shouldStopAtMarkdownBlock(markdownStateTracker, i)) {
-            return; // Stop without yielding the final closing ```
-          } else {
-            // This is an inner block delimiter, yield it as content
-            yield line;
-            continue;
-          }
-        }
-
-        // Original logic for non-markdown files or simple cases
         nestCount--;
         if (nestCount === 0) {
-          // We've closed the outer wrapper - stop without yielding the closing ```
+          // Closed the outer wrapper
           return;
-        } else {
-          // This is a nested block closing, yield it as content
-          yield line;
         }
-      } else if (line.startsWith("```")) {
-        // Going into a nested codeblock
+        yield line;
+      } else if (line.trimStart().startsWith("```")) {
         nestCount++;
         yield line;
       } else {
-        // Otherwise just yield the line as content
         yield line;
       }
+    }
+  }
+
+  // If we ended without ever seeing a fence, yield any remaining buffer (the fallback)
+  if (!seenFirstFence) {
+    for (const line of buffer) {
+      yield line;
     }
   }
 }

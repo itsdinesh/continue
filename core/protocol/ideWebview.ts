@@ -46,6 +46,7 @@ export type ToIdeFromWebviewProtocol = ToIdeFromWebviewOrCoreProtocol & {
     {
       prompt: MessageContent;
       range: RangeInFileWithContents;
+      isInAgentMode?: boolean;
     },
     string | undefined,
   ];

@@ -4,11 +4,24 @@ import { osModelsEditPrompt } from "../templates/edit.js";
 
 import OpenAI from "./OpenAI.js";
 
-const kimiEditPrompt: PromptTemplate = (history: ChatMessage[], otherData: Record<string, string>) => {
+const kimiEditPrompt: PromptTemplate = (
+  history: ChatMessage[],
+  otherData: Record<string, string>,
+) => {
   return [
     {
       role: "system",
-      content: "You are a specialized code editing tool. Your output must be ONLY the requested code change, wrapped in a markdown code block. Do not explain yourself. Do not include any natural language.",
+      content:
+        "You are an expert autonomous code editing agent. Your sole purpose is to rewrite code snippets according to user instructions. You are extremely disciplined and output ONLY a single markdown code block containing NOTHING but the final code. NO preamble, NO postamble, NO explanations, and NO internal monologue.",
+    },
+    {
+      role: "user",
+      content:
+        'Please rewrite the following code to satisfy this request: "add a print statement"\n\n```python\ndef hello():\n    pass\n```\n\nTarget: python code block only.',
+    },
+    {
+      role: "assistant",
+      content: '```python\ndef hello():\n    print("Hello, world!")\n```',
     },
     {
       role: "user",
@@ -18,7 +31,7 @@ const kimiEditPrompt: PromptTemplate = (history: ChatMessage[], otherData: Recor
 ${otherData.codeToEdit}
 \`\`\`
 
-Rewritten code:`,
+Target: ${otherData.language} code block only.`,
     },
   ];
 };

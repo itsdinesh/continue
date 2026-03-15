@@ -61,6 +61,7 @@ export const streamEditThunk = createAsyncThunk<
         const response = await extra.ideMessenger.request("edit/sendPrompt", {
           prompt,
           range: codeToEdit[0] as RangeInFileWithContents,
+          isInAgentMode: getState().session.mode === "agent",
         });
 
         dispatch(setInactive());

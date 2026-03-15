@@ -1510,6 +1510,7 @@ interface StreamDiffLinesOptionsBase {
   language: string | undefined;
   modelTitle: string | undefined;
   includeRulesInSystemMessage: boolean;
+  isInAgentMode?: boolean;
   fileUri?: string;
 }
 
