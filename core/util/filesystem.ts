@@ -115,6 +115,21 @@ class FileSystemIde implements IDE {
     return Promise.resolve(all);
   }
 
+  async getFileType(path: string): Promise<FileType | undefined> {
+    const filepath = fileURLToPath(path);
+    if (!fs.existsSync(filepath)) {
+      return undefined;
+    }
+    const stat = fs.statSync(filepath);
+    if (stat.isDirectory()) {
+      return 2 as FileType.Directory;
+    }
+    if (stat.isSymbolicLink()) {
+      return 64 as FileType.SymbolicLink;
+    }
+    return 1 as FileType.File;
+  }
+
   getRepoName(dir: string): Promise<string | undefined> {
     return Promise.resolve(undefined);
   }

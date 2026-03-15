@@ -2,6 +2,7 @@ import { LineStream } from "../../../diff/util";
 
 import {
   collectAllLines,
+  isMarkdownFile,
   MarkdownBlockStateTracker,
 } from "../../../utils/markdownUtils";
 

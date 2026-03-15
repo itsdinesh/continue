@@ -83,6 +83,10 @@ export class MessageIde implements IDE {
     return this.request("listDir", { dir });
   }
 
+  getFileType(path: string): Promise<FileType | undefined> {
+    return this.request("getFileType", { path });
+  }
+
   showToast: IDE["showToast"] = (...params) => {
     return this.request("showToast", params);
   };

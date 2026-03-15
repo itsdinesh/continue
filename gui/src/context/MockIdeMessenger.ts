@@ -125,6 +125,7 @@ const DEFAULT_MOCK_CORE_RESPONSES: MockResponses = {
     },
   ],
   listBackgroundAgents: { agents: [], totalCount: 0 },
+  getFileType: 1, // FileType.File
 };
 
 const DEFAULT_MOCK_CORE_RESPONSE_HANDLERS: MockResponseHandlers = {
