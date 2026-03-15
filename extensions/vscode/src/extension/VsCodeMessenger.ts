@@ -810,6 +810,10 @@ export class VsCodeMessenger {
       return await ide.listDir(msg.data.dir);
     });
 
+    this.onWebviewOrCore("getFileType", async (msg) => {
+      return await ide.getFileType(msg.data.path);
+    });
+
     this.onWebviewOrCore("getRepoName", async (msg) => {
       return await ide.getRepoName(msg.data.dir);
     });

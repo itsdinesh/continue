@@ -918,6 +918,7 @@ export interface IDE {
 
   listDir(dir: string): Promise<[string, FileType][]>;
 
+  getFileType(path: string): Promise<FileType | undefined>;
   getFileStats(files: string[]): Promise<FileStatsMap>;
 
   // Secret Storage

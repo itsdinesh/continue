@@ -1,5 +1,5 @@
 import { Editor, EditorContent, JSONContent } from "@tiptap/react";
-import { ContextProviderDescription, InputModifiers } from "core";
+import { ContextProviderDescription, FileType, InputModifiers } from "core";
 import { modelSupportsImages } from "core/llm/autodetect";
 import {
   memo,
@@ -56,6 +56,9 @@ function TipTapEditorInner(props: TipTapEditorProps) {
   const isStreaming = useAppSelector((state) => state.session.isStreaming);
   const historyLength = useAppSelector((store) => store.session.history.length);
   const isInEdit = useAppSelector((store) => store.session.isInEdit);
+  const isInAgentMode = useAppSelector(
+    (store) => store.session.mode === "agent",
+  );
 
   const { editor, onEnter } = createEditorConfig({
     props,
@@ -237,6 +240,57 @@ function TipTapEditorInner(props: TipTapEditorProps) {
       }}
       onDrop={(event) => {
         setShowDragOverMsg(false);
+
+        const uriList = event.dataTransfer.getData("text/uri-list");
+        if (uriList && isInAgentMode) {
+          event.preventDefault();
+          const uris = uriList.split("\n").filter((u) => u.trim().length > 0);
+
+          uris.forEach(async (uri) => {
+            // Handle both file:// and platform-specific paths
+            let path = uri;
+            try {
+              const url = new URL(uri);
+              if (url.protocol === "file:") {
+                path = decodeURIComponent(url.pathname);
+                // On Windows, the pathname might start with /C:/
+                if (path.startsWith("/") && path.match(/^\/[a-zA-Z]:/)) {
+                  path = path.slice(1);
+                }
+              }
+            } catch (e) {
+              // Not a valid URL, treat as raw path
+            }
+
+            const fileType = await ideMessenger.request("getFileType", {
+              path,
+            });
+
+            if (fileType.status === "success" && fileType.content !== undefined) {
+              const type =
+                fileType.content === FileType.Directory ? "folder" : "file";
+              const name = path.split(/[/\\]/).pop() || path;
+
+              if (editor) {
+                editor
+                  .chain()
+                  .insertContent({
+                    type: "mention",
+                    attrs: {
+                      id: type,
+                      query: path,
+                      itemType: type,
+                      label: name,
+                    },
+                  })
+                  .insertContent(" ")
+                  .run();
+              }
+            }
+          });
+          return;
+        }
+
         if (
           !defaultModel ||
           !modelSupportsImages(
@@ -301,13 +355,22 @@ function TipTapEditorInner(props: TipTapEditorProps) {
       </div>
 
       {showDragOverMsg &&
-        modelSupportsImages(
-          defaultModel?.provider || "",
-          defaultModel?.model || "",
-          defaultModel?.title,
-          defaultModel?.capabilities,
-        ) && (
-          <DragOverlay show={showDragOverMsg} setShow={setShowDragOverMsg} />
+        (isInAgentMode ||
+          modelSupportsImages(
+            defaultModel?.provider || "",
+            defaultModel?.model || "",
+            defaultModel?.title,
+            defaultModel?.capabilities,
+          )) && (
+          <DragOverlay
+            show={showDragOverMsg}
+            setShow={setShowDragOverMsg}
+            message={
+              isInAgentMode
+                ? "Drop files or folders to add to context"
+                : undefined
+            }
+          />
         )}
       <div id={TIPPY_DIV_ID} className="fixed z-50" />
     </InputBoxDiv>

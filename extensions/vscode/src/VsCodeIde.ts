@@ -676,6 +676,14 @@ class VsCodeIde implements IDE {
     return entries === null ? [] : (entries as any);
   }
 
+  async getFileType(path: string): Promise<FileType | undefined> {
+    const stat = await this.ideUtils.stat(vscode.Uri.parse(path));
+    if (!stat) {
+      return undefined;
+    }
+    return stat.type as unknown as FileType;
+  }
+
   private getIdeSettingsSync(): IdeSettings {
     const settings = vscode.workspace.getConfiguration(EXTENSION_NAME);
     const remoteConfigServerUrl = settings.get<string | undefined>(

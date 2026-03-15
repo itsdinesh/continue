@@ -4,9 +4,14 @@ import { HoverDiv, HoverTextDiv } from "./StyledComponents";
 interface DragOverlayProps {
   show: boolean;
   setShow: (show: boolean) => void;
+  message?: string;
 }
 
-export const DragOverlay: React.FC<DragOverlayProps> = ({ show, setShow }) => {
+export const DragOverlay: React.FC<DragOverlayProps> = ({
+  show,
+  setShow,
+  message,
+}) => {
   useEffect(() => {
     const overListener = (event: DragEvent) => {
       if (event.shiftKey) return;
@@ -34,7 +39,7 @@ export const DragOverlay: React.FC<DragOverlayProps> = ({ show, setShow }) => {
   return (
     <>
       <HoverDiv />
-      <HoverTextDiv>Hold ⇧ to drop image</HoverTextDiv>
+      <HoverTextDiv>{message ?? "Hold ⇧ to drop image"}</HoverTextDiv>
     </>
   );
 };

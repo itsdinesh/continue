@@ -80,6 +80,7 @@ export type ToIdeFromWebviewOrCoreProtocol = {
   ];
   getGitRootPath: [{ dir: string }, string | undefined];
   listDir: [{ dir: string }, [string, FileType][]];
+  getFileType: [{ path: string }, FileType | undefined];
   getFileStats: [{ files: string[] }, FileStatsMap];
 
   gotoDefinition: [{ location: Location }, RangeInFile[]];
